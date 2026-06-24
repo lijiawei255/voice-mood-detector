@@ -1,0 +1,72 @@
+# ==================== Python ====================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+dist/
+build/
+*.spec
+*.spec.bak
+*.manifest
+
+# 虚拟环境
+.venv/
+venv/
+env/
+ENV/
+
+# ==================== 项目数据（绝不提交） ====================
+portable_data/
+models/
+recordings/
+temp/
+cache/
+logs/
+history.json
+history.json.bak
+history.json.corrupted
+*.log
+
+# ==================== 音频文件 ====================
+*.wav
+*.mp3
+*.flac
+*.ogg
+
+# ==================== 文档输出 ====================
+*.pdf
+*.xlsx
+*.xls
+*.docx
+*.doc
+
+# ==================== IDE / 编辑器 ====================
+.trae/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ==================== 操作系统 ====================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+
+# ==================== 测试/调试（可选提交） ====================
+# 如果需要提交测试文件，请注释掉以下行
+test_*.py
+debug_*.py
