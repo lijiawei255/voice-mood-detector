@@ -33,6 +33,13 @@ The system adopts a **portable mode** design — all user data (recordings, mode
 | 📈 Trend Charts | Visualize emotional stability change trends |
 | 💾 Portable Mode | All data saved in program folder, plug-and-play |
 | 🧹 One-click Cleanup | One-click cleanup of temp files, cache, logs, etc. |
+| 📐 VAD Dimension Assessment | Valence, Arousal, Dominance & Negative Load estimation |
+| 🔊 Audio Quality Analysis | Real-time recording quality feedback (volume, clipping, noise, speech ratio) |
+| 📡 Acoustic Feature Extraction | Clinical-grade features: F0, jitter, shimmer, HNR, MFCC (P1) |
+| 🔬 Research Mode | Dual-model cross-validation, multi-sample evaluation, ICC reliability (P1) |
+| 📤 Research Data Export | CSV (SPSS/Excel compatible) & JSON full research dataset export (P1) |
+| 🎚️ Stability Factor Breakdown | Negative weight, entropy, extremity sub-scores output |
+| 🔍 Raw Output Preservation | Complete model labels/scores saved for research reproducibility |
 
 ---
 
