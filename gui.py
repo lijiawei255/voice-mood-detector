@@ -47,6 +47,13 @@ from emotion_recognizer import EmotionRecognizer
 from history_manager import HistoryManager
 from gui_widgets.result_cards import ResultCardWidget, DimensionBar
 from gui_widgets.research_panel import ResearchRadarChart, ExportToolbar
+from gui_widgets.score_card import ScoreCard
+from gui_widgets.background import ConstructivistBackground
+from gui_widgets.chart import MplCanvas
+from gui_widgets.threads import RecordingThread, AnalysisThread, ModelLoadThread
+from gui_widgets.toast import ToastNotification, ToastManager
+from gui_widgets.baseline_panel import BaselinePanel
+from gui_widgets.stats_panel import StatsPanel
 from app_paths import (
     get_recordings_dir, get_log_file, get_temp_dir,
     get_cache_dir, get_user_data_dir, get_model_cache_dir,
@@ -102,619 +109,7 @@ def exception_safe(default_return=None):
     return decorator
 
 
-class RecordingThread(QThread):
-    """
-    录音线程类
-
-    在独立线程中执行音频录制操作，避免阻塞 GUI 界面。
-    通过 Qt 信号与主线程通信：
-    - duration_updated: 录音时长更新（每 100ms 触发一次）
-    - recording_finished: 录音完成，返回音频文件路径
-    - recording_error: 录音出错，返回错误信息
-
-    参数：
-        recorder (AudioRecorder): 音频录制器实例
-        output_path (str): 录音保存路径
-    """
-    duration_updated = pyqtSignal(float)
-    recording_finished = pyqtSignal(str)
-    recording_error = pyqtSignal(str)
-
-    def __init__(self, recorder, output_path):
-        super().__init__()
-        self.recorder = recorder
-        self.output_path = output_path
-        self._stop_requested = False
-
-    def run(self):
-        try:
-            success = self.recorder.start_recording(self.output_path)
-            if not success:
-                self.recording_error.emit("录音启动失败，请检查麦克风是否正常连接")
-                return
-
-            while self.recorder.is_recording() and not self._stop_requested:
-                duration = self.recorder.get_duration()
-                self.duration_updated.emit(duration)
-                self.msleep(100)
-
-            output = self.recorder.stop_recording()
-            if output:
-                self.recording_finished.emit(output)
-            else:
-                self.recording_error.emit("录音保存失败，请检查磁盘空间")
-        except Exception as e:
-            logger.error(f"录音线程异常: {str(e)}", exc_info=True)
-            self.recording_error.emit(f"录音异常: {str(e)}")
-
-    def stop(self):
-        self._stop_requested = True
-
-
-class AnalysisThread(QThread):
-    """
-    情绪分析线程类
-
-    在独立线程中执行 AI 模型推理，避免阻塞 GUI 界面。
-    通过 Qt 信号与主线程通信：
-    - analysis_finished: 分析完成，返回结果字典
-    - analysis_error: 分析出错，返回错误信息
-
-    参数：
-        recognizer (EmotionRecognizer): 情绪识别器实例
-        audio_path (str): 待分析的音频文件路径
-    """
-    analysis_finished = pyqtSignal(dict)
-    analysis_error = pyqtSignal(str)
-
-    def __init__(self, recognizer, audio_path):
-        super().__init__()
-        self.recognizer = recognizer
-        self.audio_path = audio_path
-
-    def run(self):
-        try:
-            if not os.path.exists(self.audio_path):
-                self.analysis_error.emit("音频文件不存在，可能已被删除")
-                return
-            result = self.recognizer.predict(self.audio_path)
-            self.analysis_finished.emit(result)
-        except Exception as e:
-            logger.error(f"分析线程异常: {str(e)}", exc_info=True)
-            self.analysis_error.emit(f"分析异常: {str(e)}")
-
-
-class ModelLoadThread(QThread):
-    """
-    模型加载线程类
-
-    在独立线程中加载 AI 模型，避免阻塞 GUI 启动界面。
-    通过 Qt 信号与主线程通信：
-    - model_loaded: 模型加载完成（成功或失败）
-    - progress_update: 加载进度更新
-
-    参数：
-        recognizer (EmotionRecognizer): 情绪识别器实例
-    """
-    model_loaded = pyqtSignal(bool, str)
-    progress_update = pyqtSignal(str)
-
-    def __init__(self, recognizer):
-        super().__init__()
-        self.recognizer = recognizer
-
-    def run(self):
-        def on_progress(msg):
-            self.progress_update.emit(msg)
-
-        def on_loaded(success, error):
-            self.model_loaded.emit(success, error or "")
-
-        self.recognizer.add_progress_callback(on_progress)
-        self.recognizer.load_model(callback=on_loaded)
-
-        while self.recognizer.loading:
-            self.msleep(100)
-
-
-class MplCanvas(FigureCanvas):
-    """
-    matplotlib 图表画布类
-
-    封装 matplotlib 的 FigureCanvas，用于在 PyQt5 界面中显示图表。
-    主要功能：
-    - 绘制情绪稳定度变化趋势图
-    - 自动配置中文字体（微软雅黑/黑体）
-    - 支持分区域着色（不同稳定度等级不同颜色）
-    - 使用日期时间作为 x 轴标签
-    - 数据点标签仅在数据点 <= 20 个时显示
-    - 图例位于图表下方，不占用绘图区域
-
-    参数：
-        parent: 父窗口部件
-        width: 图表宽度（英寸）
-        height: 图表高度（英寸）
-        dpi: 图表分辨率
-    """
-    def __init__(self, parent=None, width=10, height=6, dpi=100):
-        if MATPLOTLIB_AVAILABLE:
-            self.fig = Figure(figsize=(width, height), dpi=dpi)
-            self.axes = self.fig.add_subplot(111)
-            super().__init__(self.fig)
-            self.setParent(parent)
-            self.setup_chinese_font()
-            self.plot_data([])
-        else:
-            super().__init__(Figure())
-
-    def setup_chinese_font(self):
-        try:
-            import matplotlib
-            matplotlib.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS']
-            matplotlib.rcParams['axes.unicode_minus'] = False
-        except Exception as e:
-            logger.warning(f"设置中文字体失败: {str(e)}")
-
-    def _draw_background_zones(self):
-        """绘制稳定度背景色带 - 构成主义单色梯度"""
-        self.axes.axhspan(0, 2, alpha=0.06, color='#2B2B2B', zorder=0)
-        self.axes.axhspan(2, 4, alpha=0.04, color='#2B2B2B', zorder=0)
-        self.axes.axhspan(4, 6, alpha=0.06, color='#8A8580', zorder=0)
-        self.axes.axhspan(6, 8, alpha=0.08, color='#C44B4F', zorder=0)
-        self.axes.axhspan(8, 10, alpha=0.12, color='#C44B4F', zorder=0)
-
-    def _draw_legend(self):
-        """绘制图例 - 构成主义简洁风格"""
-        from matplotlib.patches import Patch
-        legend_elements = [
-            Patch(facecolor='#2B2B2B', alpha=0.3, label='稳定 (0-4)'),
-            Patch(facecolor='#8A8580', alpha=0.4, label='波动 (4-6)'),
-            Patch(facecolor='#C44B4F', alpha=0.5, label='不稳定 (6-10)'),
-        ]
-        self.fig.legend(
-            handles=legend_elements,
-            loc='upper right',
-            bbox_to_anchor=(0.98, 0.98),
-            ncol=3,
-            fontsize=8,
-            frameon=True,
-            framealpha=0.9,
-            edgecolor='#2B2B2B',
-            borderpad=0.4,
-            columnspacing=1.0,
-            handlelength=1.2,
-            handletextpad=0.4
-        )
-
-    def plot_data(self, records):
-        if not MATPLOTLIB_AVAILABLE:
-            return
-
-        try:
-            self.axes.clear()
-            # 清除旧的fig级别图例
-            for leg in self.fig.legends:
-                leg.remove()
-
-            if not records:
-                self.fig.set_facecolor('#F2EDE4')
-                self.axes.set_facecolor('#F2EDE4')
-                self.axes.set_title("情绪稳定度变化趋势", fontsize=13, fontweight='bold', pad=12, loc='left')
-                self.axes.set_ylabel("情绪稳定度 (0-10)", fontsize=10, fontweight='bold', labelpad=10)
-                self.axes.set_ylim(0, 10)
-                self.axes.grid(True, alpha=0.3, linestyle='--', zorder=1)
-                self._draw_background_zones()
-                self._draw_legend()
-                self.fig.tight_layout(pad=2.0)
-                self.fig.subplots_adjust(bottom=0.15, top=0.88)
-                self.draw()
-                return
-
-            records_chronological = sorted(records, key=lambda x: x.get("timestamp", ""))
-            n = len(records_chronological)
-            x = list(range(1, n + 1))
-            y = []
-            timestamps = []
-            for r in records_chronological:
-                try:
-                    score = r.get('情绪稳定度分数', r.get('anxiety_score', 0.0))
-                    y.append(float(score))
-                except (TypeError, ValueError):
-                    y.append(0.0)
-                timestamps.append(str(r.get('timestamp', '')))
-
-            self.fig.set_facecolor('#F2EDE4')
-            self.axes.set_facecolor('#F2EDE4')
-
-            # 背景色带
-            self._draw_background_zones()
-
-            # 绘制趋势线 - 构成主义工业风格：砖红线条+方块数据点
-            self.axes.plot(x, y, color='#C44B4F', linewidth=2, marker='s',
-                           markersize=5, markerfacecolor='#C44B4F',
-                           markeredgecolor='#2B2B2B', markeredgewidth=1,
-                           zorder=5)
-
-            # 数据点标签（仅 <= 20 个时显示）
-            if n <= 20:
-                for xi, yi in zip(x, y):
-                    self.axes.annotate(f'{yi:.1f}', (xi, yi), textcoords="offset points",
-                                      xytext=(0, 10), ha='center', fontsize=8,
-                                      fontweight='bold', color='#2B2B2B', zorder=6)
-
-            # x 轴标签：使用日期时间
-            self.axes.set_title("情绪稳定度变化趋势", fontsize=13, fontweight='bold', pad=12, loc='left')
-            self.axes.set_ylabel("情绪稳定度 (0-10)", fontsize=10, fontweight='bold', labelpad=10)
-            self.axes.set_ylim(-0.3, 10.3)
-            self.axes.set_xlim(0.5, n + 0.5)
-            self.axes.grid(True, alpha=0.3, linestyle='--', zorder=1)
-
-            # 设置 x 轴刻度
-            if n <= 15:
-                # 少量数据：显示所有日期时间标签
-                self.axes.set_xticks(x)
-                date_labels = []
-                for ts in timestamps:
-                    try:
-                        dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
-                        date_labels.append(dt.strftime("%m-%d %H:%M"))
-                    except (ValueError, TypeError):
-                        date_labels.append(ts[-8:] if ts else "")
-                self.axes.set_xticklabels(date_labels, rotation=45, ha='right', fontsize=8)
-            elif n <= 40:
-                # 中等数据：每隔几个显示一个
-                step = max(1, n // 10)
-                tick_positions = x[::step]
-                tick_labels = []
-                for i in range(0, n, step):
-                    try:
-                        dt = datetime.strptime(timestamps[i], "%Y-%m-%d %H:%M:%S")
-                        tick_labels.append(dt.strftime("%m-%d %H:%M"))
-                    except (ValueError, TypeError):
-                        tick_labels.append("")
-                self.axes.set_xticks(tick_positions)
-                self.axes.set_xticklabels(tick_labels, rotation=45, ha='right', fontsize=8)
-            else:
-                # 大量数据：只显示首尾和中间几个
-                tick_positions = [x[0], x[n//4], x[n//2], x[3*n//4], x[-1]]
-                tick_labels = []
-                for idx in [0, n//4, n//2, 3*n//4, n-1]:
-                    try:
-                        dt = datetime.strptime(timestamps[idx], "%Y-%m-%d %H:%M:%S")
-                        tick_labels.append(dt.strftime("%m-%d %H:%M"))
-                    except (ValueError, TypeError):
-                        tick_labels.append("")
-                self.axes.set_xticks(tick_positions)
-                self.axes.set_xticklabels(tick_labels, rotation=45, ha='right', fontsize=8)
-
-            self.axes.set_xlabel("", fontsize=10, labelpad=10)
-
-            # 图例
-            self._draw_legend()
-
-            # 布局调整
-            self.fig.tight_layout(pad=2.5)
-            self.fig.subplots_adjust(bottom=0.20, left=0.08, right=0.95, top=0.88)
-            self.draw()
-        except Exception as e:
-            logger.error(f"绘图失败: {str(e)}", exc_info=True)
-
-
-
-class ToastNotification(QFrame):
-    """
-    苹果风格弹窗通知组件
-
-    用于在界面右上角展示错误/警告信息，支持自动消失和手动关闭。
-    """
-
-    def __init__(self, parent, message, level="warning", duration=5000):
-        super().__init__(parent)
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.SubWindow)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setFixedWidth(380)
-        self._opacity = 1.0
-
-        # 图标和颜色 - 构成主义风格
-        if level == "error":
-            icon = "■"  # 几何方块
-            bg_color = "#F2EDE4"
-            border_color = "#C44B4F"
-            title_color = "#C44B4F"
-            title_text = "错误"
-        else:
-            icon = "▲"  # 几何三角
-            bg_color = "#F2EDE4"
-            border_color = "#8A8580"
-            title_color = "#2B2B2B"
-            title_text = "警告"
-
-        # 布局
-        main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(16, 12, 12, 12)
-        main_layout.setSpacing(10)
-
-        # 图标
-        icon_label = QLabel(icon)
-        icon_label.setFont(QFont("Segoe UI Emoji", 16))
-        icon_label.setFixedSize(32, 32)
-        icon_label.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(icon_label)
-
-        # 内容区
-        content_layout = QVBoxLayout()
-        content_layout.setSpacing(2)
-
-        title_label = QLabel(title_text)
-        title_label.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
-        title_label.setStyleSheet(f"color: {title_color}; background: transparent;")
-        content_layout.addWidget(title_label)
-
-        msg_label = QLabel(message)
-        msg_label.setFont(QFont("Microsoft YaHei", 9))
-        msg_label.setWordWrap(True)
-        msg_label.setStyleSheet("color: #2B2B2B; background: transparent;")
-        msg_label.setMaximumWidth(280)
-        content_layout.addWidget(msg_label)
-
-        main_layout.addLayout(content_layout, 1)
-
-        # 关闭按钮
-        close_btn = QPushButton("×")
-        close_btn.setFixedSize(24, 24)
-        close_btn.setFont(QFont("Arial", 14))
-        close_btn.setCursor(Qt.PointingHandCursor)
-        close_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                border: none;
-                color: #2B2B2B;
-                border-radius: 0px;
-            }
-            QPushButton:hover {
-                background: rgba(43,43,43,0.1);
-                color: #C44B4F;
-            }
-        """)
-        close_btn.clicked.connect(self.fade_out)
-        main_layout.addWidget(close_btn, 0, Qt.AlignTop)
-
-        self.setStyleSheet(f"""
-            ToastNotification {{
-                background-color: {bg_color};
-                border: 3px solid {border_color};
-                border-radius: 0px;
-            }}
-        """)
-
-        # 硬阴影效果 - 构成主义风格
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(0)
-        shadow.setColor(QColor(43, 43, 43, 60))
-        shadow.setOffset(3, 3)
-        self.setGraphicsEffect(shadow)
-
-        self.adjustSize()
-
-        # 自动消失定时器
-        self._timer = QTimer(self)
-        self._timer.setSingleShot(True)
-        self._timer.timeout.connect(self.fade_out)
-        self._timer.start(duration)
-
-    def fade_out(self):
-        """ 淡出动画后关闭 """
-        self._timer.stop()
-        # 用一个简单的定时器动画模拟淡出
-        self._fade_timer = QTimer(self)
-        self._fade_step = 0
-        self._fade_timer.timeout.connect(self._do_fade)
-        self._fade_timer.start(30)
-
-    def _do_fade(self):
-        self._fade_step += 1
-        self._opacity = max(0, 1.0 - self._fade_step * 0.1)
-        self.setWindowOpacity(self._opacity) if hasattr(self, 'setWindowOpacity') else None
-        self.update()
-        if self._fade_step >= 10:
-            self._fade_timer.stop()
-            self.close()
-            self.deleteLater()
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setOpacity(self._opacity)
-        path = QPainterPath()
-        path.addRect(0, 0, self.width(), self.height())
-        painter.fillPath(path, QBrush(self.palette().window().color()))
-        super().paintEvent(event)
-
-
-class ToastManager:
-    """
-    Toast通知管理器
-
-    管理多个Toast的显示位置，避免重叠。
-    """
-    def __init__(self, parent):
-        self.parent = parent
-        self.toasts = []
-
-    def show_toast(self, message, level="warning", duration=5000):
-        """ 显示一个Toast通知 """
-        # 清理已关闭的toast
-        self.toasts = [t for t in self.toasts if t.isVisible()]
-
-        toast = ToastNotification(self.parent, message, level, duration)
-        self.toasts.append(toast)
-
-        # 计算位置（右上角堆叠）
-        self._reposition()
-        toast.show()
-
-    def _reposition(self):
-        """ 重新计算所有toast位置 """
-        margin_top = 20
-        margin_right = 20
-        spacing = 10
-        y_offset = margin_top
-
-        parent_rect = self.parent.rect()
-        for toast in self.toasts:
-            if toast.isVisible():
-                x = parent_rect.width() - toast.width() - margin_right
-                toast.move(x, y_offset)
-                y_offset += toast.height() + spacing
-
-
-class ConstructivistBackground(QWidget):
-    """构成主义几何背景层 - 苏联构成主义风格"""
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setAttribute(Qt.WA_TransparentForMouseEvents)
-        self._cache = None
-
-    def paintEvent(self, event):
-        if self._cache and self._cache.size() == self.size():
-            painter = QPainter(self)
-            painter.drawPixmap(0, 0, self._cache)
-            return
-
-        from PyQt5.QtGui import QLinearGradient, QPixmap, QPolygon
-        from PyQt5.QtCore import QPoint
-        pixmap = QPixmap(self.size())
-        p = QPainter(pixmap)
-        p.setRenderHint(QPainter.Antialiasing)
-
-        # 渐变背景：暖白到暖灰
-        gradient = QLinearGradient(0, 0, 0, self.height())
-        gradient.setColorAt(0, QColor("#F2EDE4"))
-        gradient.setColorAt(1, QColor("#E8E3DA"))
-        p.fillRect(self.rect(), gradient)
-
-        # 45度斜线纹理（极淡，工业感）
-        pen = QPen(QColor(43, 43, 43, 12))  # #2B2B2B 透明度约5%
-        pen.setWidth(1)
-        p.setPen(pen)
-        spacing = 60
-        for i in range(-self.height(), self.width() + self.height(), spacing):
-            p.drawLine(i, 0, i + self.height(), self.height())
-
-        # 左上角砖红色45度三角形
-        p.setPen(Qt.NoPen)
-        p.setBrush(QColor("#C44B4F"))
-        triangle_tl = QPolygon([QPoint(0, 0), QPoint(45, 0), QPoint(0, 45)])
-        p.drawPolygon(triangle_tl)
-
-        # 右下角炭黑色45度三角形
-        p.setBrush(QColor("#2B2B2B"))
-        w, h = self.width(), self.height()
-        triangle_br = QPolygon([QPoint(w, h), QPoint(w - 38, h), QPoint(w, h - 38)])
-        p.drawPolygon(triangle_br)
-
-        # 左下角细小砖红装饰线（45度）
-        pen2 = QPen(QColor("#C44B4F"))
-        pen2.setWidth(2)
-        p.setPen(pen2)
-        p.drawLine(0, h - 20, 20, h)
-
-        p.end()
-        self._cache = pixmap
-        painter = QPainter(self)
-        painter.drawPixmap(0, 0, self._cache)
-
-    def resizeEvent(self, event):
-        self._cache = None
-        super().resizeEvent(event)
-
-
-class ScoreCard(QFrame):
-    """
-    分数卡片控件类 - 苏联构成主义风格
-
-    自定义的分数展示卡片控件，用于在结果区域显示：
-    - 情绪稳定度分数
-    - 情绪状态等级
-    - 主要情绪
-
-    设计特点：
-    - 构成主义风格：粗炭黑边框、直角、三角装饰
-    - 等宽粗体数字展示为视觉焦点
-    - 支持自定义颜色和副标题
-    - 支持重置为空状态
-
-    参数：
-        title (str): 卡片标题
-        parent: 父窗口部件
-        accent_color (str): 装饰色（砖红）
-    """
-    def __init__(self, title, parent=None, accent_color="#C44B4F"):
-        super().__init__(parent)
-        self.setObjectName("scoreCard")
-        self.setMinimumHeight(180)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self._accent_color = accent_color
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(25, 22, 25, 22)
-        layout.setSpacing(10)
-
-        self.title_label = QLabel(title)
-        self.title_label.setObjectName("cardTitle")
-        self.title_label.setAlignment(Qt.AlignCenter)
-        self.title_label.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
-        self.title_label.setMinimumHeight(25)
-        layout.addWidget(self.title_label)
-
-        self.value_label = QLabel("--")
-        self.value_label.setObjectName("cardValue")
-        self.value_label.setAlignment(Qt.AlignCenter)
-        self.value_label.setFont(QFont("Consolas", 38, QFont.Bold))
-        self.value_label.setMinimumHeight(60)
-        self.value_label.setWordWrap(False)
-        layout.addWidget(self.value_label, 1)
-
-        self.sub_label = QLabel("")
-        self.sub_label.setObjectName("cardSub")
-        self.sub_label.setAlignment(Qt.AlignCenter)
-        self.sub_label.setFont(QFont("Microsoft YaHei", 11))
-        self.sub_label.setMinimumHeight(25)
-        layout.addWidget(self.sub_label)
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing, False)
-        # 炭黑粗边框
-        pen = QPen(QColor("#2B2B2B"))
-        pen.setWidth(3)
-        painter.setPen(pen)
-        painter.drawRect(2, 2, self.width()-4, self.height()-4)
-        # 左上角45度三角装饰（砖红）
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(self._accent_color))
-        from PyQt5.QtGui import QPolygon
-        from PyQt5.QtCore import QPoint
-        triangle = QPolygon([QPoint(0, 0), QPoint(20, 0), QPoint(0, 20)])
-        painter.drawPolygon(triangle)
-        painter.end()
-        super().paintEvent(event)
-
-    def set_value(self, value, color=None, sub_text=""):
-        self.value_label.setText(str(value))
-        if color:
-            self.value_label.setStyleSheet(f"color: {color};")
-        if sub_text:
-            self.sub_label.setText(sub_text)
-            self.sub_label.setVisible(True)
-        else:
-            self.sub_label.setVisible(False)
-
-    def reset(self):
-        self.value_label.setText("--")
-        self.value_label.setStyleSheet("")
-        self.sub_label.setText("")
-        self.sub_label.setVisible(False)
+# 后台线程类已移至 gui_widgets.threads 模块
 
 
 class WelcomeDialog(QDialog):
@@ -1562,14 +957,19 @@ class MainWindow(QMainWindow):
         header_layout = QHBoxLayout(header_frame)
         header_layout.setContentsMargins(25, 12, 25, 12)
 
-        # 标题左侧红色三角装饰块
+        # 标题左侧大型红色楔形块（构成主义标志性元素）
         title_accent = QLabel()
-        title_accent.setFixedSize(12, 28)
-        title_accent.setStyleSheet("background-color: #C44B4F;")
+        title_accent.setFixedSize(18, 34)
+        title_accent.setStyleSheet("background-color: #C44B4F; border: 2px solid #2B2B2B;")
         header_layout.addWidget(title_accent)
+        # 红色楔形与标题之间的细黑分隔条
+        sep = QLabel()
+        sep.setFixedSize(8, 34)
+        sep.setStyleSheet("background-color: #2B2B2B;")
+        header_layout.addWidget(sep)
 
         title_label = QLabel("语音情绪识别系统")
-        title_label.setFont(QFont("Microsoft YaHei", 26, QFont.Black))
+        title_label.setFont(QFont("Microsoft YaHei", 28, QFont.Black))
         title_label.setObjectName("headerTitle")
         header_layout.addWidget(title_label)
         header_layout.addStretch()
@@ -1765,8 +1165,8 @@ class MainWindow(QMainWindow):
         self.quality_feedback.setAlignment(Qt.AlignCenter)
         self.quality_feedback.setMinimumHeight(28)
         self.quality_feedback.setStyleSheet(
-            "background-color: #F7F5F2; border: 2px solid #D4CFC8; "
-            "padding: 4px; color: #8A8580;"
+            "background-color: #F2EDE4; border: 2px solid #2B2B2B; "
+            "padding: 4px; color: #2B2B2B; font-weight: bold;"
         )
         info_grid.addWidget(self.quality_feedback, 1, 1)
 
@@ -1793,20 +1193,23 @@ class MainWindow(QMainWindow):
         result_layout.setSpacing(18)
         result_layout.setContentsMargins(25, 25, 25, 25)
 
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(16)
+        # 构成主义不对称卡片布局：左侧大卡片(2列宽) + 右侧3小卡片堆叠
+        cards_grid = QGridLayout()
+        cards_grid.setSpacing(12)
 
         self.score_card = ScoreCard("情绪稳定度 (0-10)", accent_color="#C44B4F")
+        self.score_card.setMinimumHeight(220)
         self.level_card = ScoreCard("情绪状态", accent_color="#C44B4F")
         self.emotion_card = ScoreCard("主要情绪", accent_color="#C44B4F")
         self.compound_card = ScoreCard("复合情绪", accent_color="#C44B4F")
 
-        cards_layout.addWidget(self.score_card)
-        cards_layout.addWidget(self.level_card)
-        cards_layout.addWidget(self.emotion_card)
-        cards_layout.addWidget(self.compound_card)
+        # 网格布局：左侧大卡片占2行2列，右侧3张小卡片各占1行1列
+        cards_grid.addWidget(self.score_card, 0, 0, 3, 2)    # 占3行2列
+        cards_grid.addWidget(self.level_card, 0, 2, 1, 1)    # 第1行第3列
+        cards_grid.addWidget(self.emotion_card, 1, 2, 1, 1)  # 第2行第3列
+        cards_grid.addWidget(self.compound_card, 2, 2, 1, 1) # 第3行第3列
 
-        result_layout.addLayout(cards_layout)
+        result_layout.addLayout(cards_grid)
 
         # P0 新增：集成化科研评估报告卡片（VAD维度 + 稳定度分项 + 音频质量）
         self.result_card_widget = ResultCardWidget()
@@ -1890,9 +1293,27 @@ class MainWindow(QMainWindow):
         right_layout.setSpacing(12)
         right_layout.setContentsMargins(5, 5, 5, 5)
 
-        quick_guide = QGroupBox("快速指南")
-        quick_guide.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
+        quick_guide = QGroupBox("▸ 快速指南")
+        quick_guide.setFont(QFont("Microsoft YaHei", 12, QFont.Black))
         quick_guide.setObjectName("guideGroup")
+        quick_guide.setStyleSheet("""
+            QGroupBox#guideGroup {
+                border: 3px solid #2B2B2B;
+                border-radius: 0px;
+                margin-top: 14px;
+                padding-top: 22px;
+                background-color: #F2EDE4;
+                font-family: 'Microsoft YaHei', 'SimHei', 'Arial Black';
+                font-weight: 900;
+            }
+            QGroupBox#guideGroup::title {
+                subcontrol-origin: margin;
+                left: 18px;
+                padding: 0 14px;
+                color: #C44B4F;
+                font-weight: 900;
+            }
+        """)
         guide_layout = QVBoxLayout(quick_guide)
         guide_layout.setContentsMargins(15, 25, 15, 15)
         guide_layout.setSpacing(10)
@@ -2051,9 +1472,17 @@ class MainWindow(QMainWindow):
         bottom_container = QVBoxLayout()
         bottom_container.setSpacing(8)
 
+        # 构成主义底部操作条：红色底板（象征"行动带"）+ 粗黑边框
         btn_frame = QFrame()
         btn_frame.setObjectName("bottomBtnFrame")
         btn_frame.setMinimumHeight(60)
+        btn_frame.setStyleSheet("""
+            QFrame#bottomBtnFrame {
+                background-color: #C44B4F;
+                border: 3px solid #2B2B2B;
+                border-radius: 0px;
+            }
+        """)
         btn_layout = QHBoxLayout(btn_frame)
         btn_layout.setSpacing(15)
         btn_layout.setContentsMargins(20, 8, 20, 8)
@@ -2065,6 +1494,22 @@ class MainWindow(QMainWindow):
         data_btn.setObjectName("dataBtn")
         data_btn.clicked.connect(self.show_data_manager)
         data_btn.setCursor(Qt.PointingHandCursor)
+        data_btn.setStyleSheet("""
+            QPushButton#dataBtn {
+                background-color: transparent;
+                color: #FFFFFF;
+                border: 2px solid #FFFFFF;
+                border-radius: 0px;
+                padding: 12px 28px;
+                font-weight: bold;
+                font-family: 'Microsoft YaHei', 'SimHei', 'Arial Black';
+            }
+            QPushButton#dataBtn:hover {
+                background-color: #2B2B2B;
+                color: #FFFFFF;
+                border-color: #FFFFFF;
+            }
+        """)
         btn_layout.addWidget(data_btn)
 
         btn_layout.addStretch()
@@ -2387,27 +1832,6 @@ class MainWindow(QMainWindow):
             height: 0;
         }
 
-        #bottomBtnFrame {
-            background-color: #2B2B2B;
-            border-radius: 0px;
-            border: none;
-        }
-
-        #dataBtn {
-            background-color: transparent;
-            color: #FFFFFF;
-            border: 2px solid #C44B4F;
-            border-radius: 2px;
-            padding: 12px 28px;
-            font-weight: bold;
-            font-family: "Microsoft YaHei", "SimHei", "Arial Black";
-        }
-
-        #dataBtn:hover {
-            background-color: #C44B4F;
-            color: #FFFFFF;
-        }
-
         #creditLabel {
             color: #8A8580;
             padding: 5px;
@@ -2633,28 +2057,28 @@ class MainWindow(QMainWindow):
             if duration < 1.0:
                 self.quality_feedback.setText("正在录音...")
                 self.quality_feedback.setStyleSheet(
-                    "background-color: #F7F5F2; border: 2px solid #D4CFC8; "
-                    "padding: 4px; color: #8A8580;"
+                    "background-color: #F2EDE4; border: 2px solid #2B2B2B; "
+                    "padding: 4px; color: #8A8580; font-weight: bold;"
                 )
             elif volume < 0.02:
                 self.quality_feedback.setText("⚠ 音量过低 — 请靠近麦克风")
                 self.quality_feedback.setStyleSheet(
-                    "background-color: #FFF3CD; border: 2px solid #F1C40F; "
-                    "padding: 4px; color: #856404; font-weight: bold;"
+                    "background-color: #F2EDE4; border: 2px solid #C44B4F; "
+                    "padding: 4px; color: #C44B4F; font-weight: bold;"
                 )
             elif volume > 0.95:
                 self.quality_feedback.setText("⚠ 音量过高 — 可能爆音")
                 self.quality_feedback.setStyleSheet(
-                    "background-color: #FFF3CD; border: 2px solid #F1C40F; "
-                    "padding: 4px; color: #856404; font-weight: bold;"
+                    "background-color: #F2EDE4; border: 2px solid #C44B4F; "
+                    "padding: 4px; color: #C44B4F; font-weight: bold;"
                 )
             else:
                 bar_len = int(volume * 12)
                 bar = "█" * bar_len + "░" * (12 - bar_len)
                 self.quality_feedback.setText(f"✓ 音量正常 {bar}")
                 self.quality_feedback.setStyleSheet(
-                    "background-color: #D4EDDA; border: 2px solid #27AE60; "
-                    "padding: 4px; color: #155724; font-weight: bold;"
+                    "background-color: #F2EDE4; border: 2px solid #2B2B2B; "
+                    "padding: 4px; color: #2B2B2B; font-weight: bold;"
                 )
         except Exception:
             pass
@@ -2827,13 +2251,14 @@ class MainWindow(QMainWindow):
                 border_color = color
                 bg_color = border_color + "15"
 
+                # 构成主义：始终使用炭黑边框，不以情绪颜色改变结构
                 self.result_group.setStyleSheet(f"""
                     QGroupBox {{
-                        border: 3px solid {border_color};
+                        border: 3px solid #2B2B2B;
                         border-radius: 0px;
                         margin-top: 12px;
                         padding-top: 20px;
-                        background-color: {bg_color};
+                        background-color: #F2EDE4;
                     }}
                     QGroupBox::title {{
                         subcontrol-origin: margin;

@@ -49,10 +49,11 @@ class StatsPanel(QGroupBox):
         self.content.setMinimumHeight(200)
         self.content.setStyleSheet("""
             QTextEdit {
-                border: 2px solid #D4CFC8;
-                background-color: #FDFCFB;
+                border: 2px solid #2B2B2B;
+                background-color: #F2EDE4;
                 padding: 8px;
                 color: #2B2B2B;
+                font-weight: bold;
             }
         """)
         layout.addWidget(self.content)

@@ -44,7 +44,7 @@ class ResearchRadarChart(QWidget):
 
         if MATPLOTLIB_AVAILABLE:
             self.figure = Figure(figsize=(3, 3), dpi=80)
-            self.figure.patch.set_facecolor('#F7F5F2')
+            self.figure.patch.set_facecolor('#F2EDE4')
             self.canvas = FigureCanvas(self.figure)
             self.ax = self.figure.add_subplot(111, polar=True)
             layout = QVBoxLayout(self)
@@ -66,7 +66,7 @@ class ResearchRadarChart(QWidget):
             self._draw()
 
     def _draw(self):
-        """绘制雷达图"""
+        """绘制雷达图 — 构成主义风格"""
         self.ax.clear()
 
         import numpy as np
@@ -95,18 +95,26 @@ class ResearchRadarChart(QWidget):
         self.ax.set_theta_direction(-1)
 
         self.ax.set_xticks(angles[:-1])
-        self.ax.set_xticklabels(categories, fontsize=8, color='#2B2B2B')
+        self.ax.set_xticklabels(categories, fontsize=9, color='#2B2B2B', fontweight='bold',
+                                fontfamily='sans-serif')
 
         self.ax.set_ylim(0, 1)
         self.ax.set_yticks([0.2, 0.4, 0.6, 0.8])
-        self.ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8'], fontsize=7, color='#8A8580')
+        self.ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8'], fontsize=8, color='#2B2B2B',
+                                fontweight='bold')
         self.ax.set_rlabel_position(30)
 
-        self.ax.fill(angles, values_plot, alpha=0.25, color='#C44B4F')
-        self.ax.plot(angles, values_plot, linewidth=2, color='#C44B4F')
+        # 网格线 - 构成主义粗线风格
+        self.ax.yaxis.grid(True, color='#2B2B2B', linewidth=1.5, linestyle='-', alpha=0.6)
+        self.ax.xaxis.grid(True, color='#2B2B2B', linewidth=1.5, linestyle='-', alpha=0.6)
 
-        self.ax.set_facecolor('#F7F5F2')
-        self.ax.spines['polar'].set_color('#D4CFC8')
+        # 填充区域 + 粗线边框
+        self.ax.fill(angles, values_plot, alpha=0.3, color='#C44B4F')
+        self.ax.plot(angles, values_plot, linewidth=3, color='#C44B4F', solid_capstyle='round')
+
+        self.ax.set_facecolor('#F2EDE4')
+        self.ax.spines['polar'].set_color('#2B2B2B')
+        self.ax.spines['polar'].set_linewidth(2.5)
 
         self.canvas.draw()
 

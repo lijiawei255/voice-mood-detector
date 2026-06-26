@@ -78,7 +78,7 @@ class DimensionBar(QWidget):
         bar_h = 14
         bar_y = (h - bar_h) // 2
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor("#E8E4DF"))
+        painter.setBrush(QColor("#E8E3DA"))
         painter.drawRect(bar_x, bar_y, bar_w, bar_h)
 
         # 计算填充比例（居中于零点或从最小值开始）
@@ -245,26 +245,32 @@ class ResultCardWidget(QFrame):
         frame.setFrameStyle(QFrame.NoFrame)
         frame.setStyleSheet("""
             QFrame#subCard {
-                background-color: #F7F5F2;
-                border: 2px solid #D4CFC8;
+                background-color: #F2EDE4;
+                border: 2px solid #2B2B2B;
             }
         """)
         return frame
 
     def paintEvent(self, event):
-        """构成主义风格边框 + 三角装饰"""
+        """构成主义风格边框 + 大型红色楔形装饰"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, False)
+        # 炭黑粗边框
         pen = QPen(QColor("#2B2B2B"))
         pen.setWidth(3)
         painter.setPen(pen)
         painter.setBrush(Qt.NoBrush)
         painter.drawRect(1, 1, self.width() - 3, self.height() - 3)
-        # 左上角三角装饰
+        # 左上角大型红色楔形（构成主义标志 — 指向右下）
         painter.setPen(Qt.NoPen)
         painter.setBrush(QColor("#C44B4F"))
-        triangle = QPolygon([QPoint(0, 0), QPoint(22, 0), QPoint(0, 22)])
-        painter.drawPolygon(triangle)
+        wedge = QPolygon([QPoint(0, 0), QPoint(30, 0), QPoint(0, 30)])
+        painter.drawPolygon(wedge)
+        # 右下角炭黑小三角（呼应）
+        painter.setBrush(QColor("#2B2B2B"))
+        w, h = self.width(), self.height()
+        tri = QPolygon([QPoint(w, h), QPoint(w - 15, h), QPoint(w, h - 15)])
+        painter.drawPolygon(tri)
         painter.end()
         super().paintEvent(event)
 
