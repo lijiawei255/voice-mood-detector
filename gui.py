@@ -792,7 +792,7 @@ class DataManagerDialog(QDialog):
 
 
 class DiagonalStripe(QWidget):
-    """构成主义对角线覆盖层 — 透明鼠标事件，绘制贯穿界面的红色斜线"""
+    """构成主义对角线覆盖层 — 透明鼠标事件，绘制贯穿界面的X交叉斜线"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -800,11 +800,17 @@ class DiagonalStripe(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        pen = QPen(QColor(196, 75, 79, 55))  # 半透明砖红
-        pen.setWidth(2)
-        p.setPen(pen)
         w, h = self.width(), self.height()
-        p.drawLine(w - 10, 0, 10, h)
+        # 主对角线：砖红色，3px
+        pen1 = QPen(QColor(196, 75, 79, 75))  # ~30% opacity
+        pen1.setWidth(3)
+        p.setPen(pen1)
+        p.drawLine(w - 5, 0, 5, h)
+        # 副对角线：炭黑色，2px
+        pen2 = QPen(QColor(43, 43, 43, 60))
+        pen2.setWidth(2)
+        p.setPen(pen2)
+        p.drawLine(w * 3 // 4, 0, w // 4, h)
         p.end()
 
 
@@ -965,10 +971,10 @@ class MainWindow(QMainWindow):
         self._bg_widget.setGeometry(central_widget.rect())
         self._bg_widget.lower()
 
-        # 构成主义对角线覆盖层
+        # 构成主义对角线覆盖层 — 前景绘制，贯穿所有控件
         self._diag_stripe = DiagonalStripe(central_widget)
         self._diag_stripe.setGeometry(central_widget.rect())
-        self._diag_stripe.lower()
+        self._diag_stripe.raise_()
 
         main_layout = QVBoxLayout(central_widget)
         main_layout.setSpacing(10)
@@ -1325,6 +1331,9 @@ class MainWindow(QMainWindow):
             bh = 40 if idx % 2 == 0 else 30
             bar.setMinimumHeight(bh)
             bar.setMaximumHeight(bh)
+            # 交替宽度打破对称
+            bw = 180 if idx % 3 == 0 else 100 + idx * 8
+            bar.setMinimumWidth(bw)
             bar.setProperty("barColor", color)
             self.prob_bars[emotion] = bar
             bar_row.addWidget(bar, 1)
