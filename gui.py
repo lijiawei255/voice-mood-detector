@@ -790,6 +790,24 @@ class DataManagerDialog(QDialog):
             QMessageBox.warning(self, "提示", f"无法打开文件夹: {str(e)}\n\n路径: {data_dir}")
 
 
+
+class DiagonalStripe(QWidget):
+    """构成主义对角线覆盖层 — 透明鼠标事件，绘制贯穿界面的红色斜线"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+    
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        pen = QPen(QColor(196, 75, 79, 55))  # 半透明砖红
+        pen.setWidth(2)
+        p.setPen(pen)
+        w, h = self.width(), self.height()
+        p.drawLine(w - 10, 0, 10, h)
+        p.end()
+
+
 class MainWindow(QMainWindow):
     """
     主窗口类
@@ -946,6 +964,11 @@ class MainWindow(QMainWindow):
         self._bg_widget = ConstructivistBackground(central_widget)
         self._bg_widget.setGeometry(central_widget.rect())
         self._bg_widget.lower()
+
+        # 构成主义对角线覆盖层
+        self._diag_stripe = DiagonalStripe(central_widget)
+        self._diag_stripe.setGeometry(central_widget.rect())
+        self._diag_stripe.lower()
 
         main_layout = QVBoxLayout(central_widget)
         main_layout.setSpacing(10)
@@ -1159,8 +1182,9 @@ class MainWindow(QMainWindow):
         control_layout.addWidget(self.record_btn)
 
         info_grid = QGridLayout()
-        info_grid.setSpacing(12)
-        info_grid.setColumnStretch(1, 1)
+        info_grid.setSpacing(10)
+        info_grid.setColumnStretch(0, 2)
+        info_grid.setColumnStretch(1, 3)
 
         duration_title = QLabel("■ 录音时长")
         duration_title.setFont(QFont("Microsoft YaHei", 11, QFont.Black))
@@ -1281,14 +1305,15 @@ class MainWindow(QMainWindow):
         emotions = [("平静", "#C44B4F"), ("开心", "#C44B4F"), ("惊讶", "#C44B4F"),
                     ("悲伤", "#C44B4F"), ("愤怒", "#C44B4F"), ("恐惧", "#C44B4F"),
                     ("厌恶", "#C44B4F")]
-        for emotion, color in emotions:
+        for idx, (emotion, color) in enumerate(emotions):
             bar_row = QHBoxLayout()
             bar_row.setSpacing(12)
 
             label = QLabel(emotion)
-            label.setFont(QFont("Microsoft YaHei", 11))
+            label.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
             label.setMinimumWidth(50)
             label.setMaximumWidth(50)
+            label.setStyleSheet("color: #2B2B2B;")
             bar_row.addWidget(label)
 
             bar = QProgressBar()
@@ -1296,8 +1321,10 @@ class MainWindow(QMainWindow):
             bar.setValue(0)
             bar.setTextVisible(False)
             bar.setObjectName(f"probBar_{emotion}")
-            bar.setMinimumHeight(36)
-            bar.setMaximumHeight(36)
+            # 构成主义：交替高度打破规整
+            bh = 40 if idx % 2 == 0 else 30
+            bar.setMinimumHeight(bh)
+            bar.setMaximumHeight(bh)
             bar.setProperty("barColor", color)
             self.prob_bars[emotion] = bar
             bar_row.addWidget(bar, 1)
@@ -1334,7 +1361,6 @@ class MainWindow(QMainWindow):
         quick_guide.setStyleSheet("""
             QGroupBox#guideGroup {
                 border: 3px solid #2B2B2B;
-                border-left: 8px solid #C44B4F;
                 border-radius: 0px;
                 margin-top: 14px;
                 padding-top: 22px;
@@ -1367,13 +1393,13 @@ class MainWindow(QMainWindow):
             "<b style='color: #FFF; background: #C44B4F; padding: 2px 8px; font-size: 13pt;'>1</b>　→ 等待模型加载完成"
             "</div>"
             "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 24px; border-left: 6px solid #2B2B2B;'>"
-            "<b style='color: #FFF; background: #2B2B2B; padding: 2px 8px; font-size: 13pt;'>2</b>　→ 点击「开始录音」按钮"
+            "<b style='color: #FFF; background: #8A8580; padding: 2px 8px; font-size: 13pt;'>2</b>　→ 点击「开始录音」按钮"
             "</div>"
             "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 48px; border-left: 6px solid #C44B4F;'>"
             "<b style='color: #FFF; background: #C44B4F; padding: 2px 8px; font-size: 13pt;'>3</b>　→ 说出您的感受（3-30秒）"
             "</div>"
             "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 24px; border-left: 6px solid #2B2B2B;'>"
-            "<b style='color: #FFF; background: #2B2B2B; padding: 2px 8px; font-size: 13pt;'>4</b>　→ 点击「停止录音」按钮"
+            "<b style='color: #FFF; background: #8A8580; padding: 2px 8px; font-size: 13pt;'>4</b>　→ 点击「停止录音」按钮"
             "</div>"
             "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 0px; border-left: 6px solid #C44B4F;'>"
             "<b style='color: #FFF; background: #C44B4F; padding: 2px 8px; font-size: 13pt;'>5</b>　→ 查看情绪分析结果"
@@ -2575,6 +2601,8 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         if hasattr(self, '_bg_widget'):
             self._bg_widget.setGeometry(self.centralWidget().rect())
+        if hasattr(self, '_diag_stripe'):
+            self._diag_stripe.setGeometry(self.centralWidget().rect())
 
     @exception_safe()
     def closeEvent(self, event):
