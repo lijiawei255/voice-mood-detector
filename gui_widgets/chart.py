@@ -205,7 +205,7 @@ class MplCanvas(FigureCanvas):
 
             # 布局调整
             self.fig.tight_layout(pad=2.5)
-            self.fig.subplots_adjust(bottom=0.20, left=0.08, right=0.95, top=0.88)
+            self.fig.subplots_adjust(bottom=0.20, left=0.10, right=0.95, top=0.88)
             self.draw()
         except Exception as e:
             logger.error(f"绘图失败: {str(e)}", exc_info=True)

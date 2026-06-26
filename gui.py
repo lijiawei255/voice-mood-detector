@@ -1596,7 +1596,7 @@ class MainWindow(QMainWindow):
 
         data_btn = QPushButton("■ 数据管理")
         data_btn.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
-        data_btn.setMinimumHeight(48)
+        data_btn.setMinimumHeight(38)
         data_btn.setMinimumWidth(150)
         data_btn.setObjectName("dataBtn")
         data_btn.clicked.connect(self.show_data_manager)
