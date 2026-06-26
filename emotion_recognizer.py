@@ -236,7 +236,7 @@ class EmotionRecognizer:
     情绪识别器类（单例模式）
 
     全局唯一的情绪识别实例，负责：
-    - 加载 emotion2vec_plus_large 预训练模型
+    - 加载 emotion2vec+ 系列预训练模型（seed/base/large，可动态切换）
     - 对音频文件进行情绪识别推理
     - 计算情绪稳定度分数
     - 生成调节建议

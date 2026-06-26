@@ -721,7 +721,7 @@ class WelcomeDialog(QDialog):
 
     在首次运行程序时显示，向用户介绍：
     - 系统功能概述
-    - AI 模型信息（emotion2vec_plus_large）
+    - AI 模型信息（emotion2vec+ 系列，支持 seed/base/large）
     - 技术栈说明
     - 使用方法步骤
     - 数据管理说明
