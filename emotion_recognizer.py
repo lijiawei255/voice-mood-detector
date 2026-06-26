@@ -549,22 +549,32 @@ class EmotionRecognizer:
 
     def _calculate_stability_score(self, probs_dict):
         """
-        计算情绪稳定度分数（多因子综合评分）
+        计算情绪稳定度分数（多因子综合评分）及分项
 
         计算逻辑综合三个因子：
         1. 负面情绪加权分数（权重 40%）：各情绪概率×影响权重
         2. 情绪分散度/熵（权重 30%）：概率分布的 Shannon 熵，高熵=不稳定
         3. 情绪极端度（权重 30%）：负面情绪是否极端高概率
 
+        权重来源：专家设定（基于情绪维度理论），待 P2 阶段通过被试数据回归优化
+
         参数：
             probs_dict (dict): 各情绪的概率字典，键为情绪名称，值为概率（0-1）
 
         返回值：
-            float: 情绪稳定度分数（0-10，越高越不稳定），保留两位小数
+            dict: 包含各因子分数和综合分数的字典
         """
         import math
         if not isinstance(probs_dict, dict):
-            return 5.0
+            return {
+                "negative_weight_score": 5.0,
+                "entropy_score": 5.0,
+                "extremity_score": 5.0,
+                "stability_score": 5.0,
+                "stability_level": "未知",
+                "stability_color": "#95A5A6",
+                "factor_weights_source": "专家设定（负面40% + 熵30% + 极端30%），基于情绪维度理论"
+            }
 
         # --- 因子 1: 负面情绪加权分数 (0-10) ---
         negative_score = 0.0
@@ -576,7 +586,7 @@ class EmotionRecognizer:
                     negative_score += prob_f * weight * 10
             except (TypeError, ValueError):
                 continue
-        negative_score = min(10.0, max(0.0, negative_score))
+        negative_score = round(min(10.0, max(0.0, negative_score)), 2)
 
         # --- 因子 2: 情绪分散度/熵 (0-10) ---
         # Shannon 熵计算，归一化到 0-10
@@ -593,7 +603,7 @@ class EmotionRecognizer:
         # 最大熵为 log2(N)，归一化
         max_entropy = math.log2(len(probs_dict)) if len(probs_dict) > 1 else 1.0
         entropy_normalized = (entropy / max_entropy) * 10.0 if max_entropy > 0 else 0.0
-        entropy_normalized = min(10.0, max(0.0, entropy_normalized))
+        entropy_score = round(min(10.0, max(0.0, entropy_normalized)), 2)
 
         # --- 因子 3: 情绪极端度 (0-10) ---
         # 检测是否存在极端高概率的负面情绪
@@ -614,16 +624,28 @@ class EmotionRecognizer:
         # 正面情绪占主导时降低不稳定度
         if positive_total > 0.5:
             extremity_score *= (1.0 - positive_total * 0.6)
-        extremity_score = min(10.0, max(0.0, extremity_score))
+        extremity_score = round(min(10.0, max(0.0, extremity_score)), 2)
 
         # --- 综合计算 ---
         w = STABILITY_FACTOR_WEIGHTS
         final_score = (
             negative_score * w["negative_weight"] +
-            entropy_normalized * w["entropy"] +
+            entropy_score * w["entropy"] +
             extremity_score * w["extremity"]
         )
-        return round(min(10.0, max(0.0, final_score)), 2)
+        final_score = round(min(10.0, max(0.0, final_score)), 2)
+
+        stability_level, level_color = self._get_stability_level(final_score)
+
+        return {
+            "negative_weight_score": negative_score,
+            "entropy_score": entropy_score,
+            "extremity_score": extremity_score,
+            "stability_score": final_score,
+            "stability_level": stability_level,
+            "stability_color": level_color,
+            "factor_weights_source": "专家设定（负面40% + 熵30% + 极端30%），基于情绪维度理论"
+        }
 
     def _get_stability_level(self, score):
         """
@@ -970,10 +992,16 @@ class EmotionRecognizer:
             main_emotion = max_label[0]
             confidence = max_label[1]
 
-            # 计算情绪稳定度
-            stability_score = self._calculate_stability_score(probs_dict)
-            stability_level, level_color = self._get_stability_level(stability_score)
+            # 计算情绪稳定度（现在返回字典，含分项分数）
+            stability_result = self._calculate_stability_score(probs_dict)
+            stability_score = stability_result["stability_score"]
+            stability_level = stability_result["stability_level"]
+            level_color = stability_result["stability_color"]
             advice = self._get_advice(main_emotion, stability_score, probs_dict)
+
+            # 计算 VAD 维度指标（从离散概率推导的估计值）
+            from vad_dimensions import compute_vad_dimensions
+            vad_dimensions = compute_vad_dimensions(probs_dict)
 
             # 检测混合情绪（概率 > 8% 且不是主要情绪的视为混合情绪）
             mixed_emotions = []
@@ -994,10 +1022,33 @@ class EmotionRecognizer:
                 "success": True,
                 "主要情绪": main_emotion,
                 "置信度": round(confidence, 4),
+                # 完整8类概率（含"其他"，用于科研记录）
+                "完整概率_8类": {k: round(v, 4) for k, v in probs_dict.items()},
+                # 显示用7类概率（排除"其他"，用于前端展示）
                 "所有情绪概率": display_probs,
+                # 原始模型输出（用于科研复算）
+                "原始模型输出": {
+                    "labels": [str(l) for l in raw_labels],
+                    "scores": [round(float(s), 6) for s in raw_scores] if raw_scores else []
+                },
+                # 稳定度及分项（含权重来源标注）
                 "情绪稳定度分数": stability_score,
                 "情绪状态等级": stability_level,
                 "等级颜色": level_color,
+                "稳定度分项": {
+                    "negative_weight_score": stability_result["negative_weight_score"],
+                    "entropy_score": stability_result["entropy_score"],
+                    "extremity_score": stability_result["extremity_score"],
+                    "factor_weights_source": stability_result["factor_weights_source"]
+                },
+                # VAD 维度指标（⚠️ 从离散概率推导的估计值）
+                "valence_score": vad_dimensions["valence_score"],
+                "arousal_score": vad_dimensions["arousal_score"],
+                "dominance_score": vad_dimensions["dominance_score"],
+                "negative_load": vad_dimensions["negative_load"],
+                "emotional_uncertainty": vad_dimensions["emotional_uncertainty"],
+                "estimation_note": vad_dimensions["estimation_note"],
+                # 原有字段
                 "调节建议": advice,
                 "混合情绪": mixed_emotions,
                 "复合情绪": compound_emotion.get("name", "") if compound_emotion else "",
