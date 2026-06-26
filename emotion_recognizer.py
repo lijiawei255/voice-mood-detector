@@ -742,14 +742,15 @@ class EmotionRecognizer:
 
     def _analyze_compound_emotions(self, probs_dict, main_emotion):
         """
-        分析复合情绪模式（内部方法）
+        分析复合情绪模式（内部方法）— P1 升级版：复合情绪强度评分
 
-        根据当前情绪概率分布，识别是否存在复合情绪模式。
-        复合情绪要求所有组成情绪的概率都超过一定阈值。
+        使用强度评分公式（替代旧版固定阈值）：
+            compound_score = min(components) × 0.5 + mean(components) × 0.3 + co_activation_bonus × 0.2
+        其中 co_activation_bonus = 各组成情绪概率乘积的归一化值
 
         心理学依据：
         - 复合情绪由多种基础情绪组合而成（如焦虑=恐惧+悲伤）
-        - 各组成情绪需同时达到一定强度才能判定为复合情绪
+        - co_activation_bonus 反映组成情绪同时激活的程度
         - "其他"情绪不参与复合情绪判断（非基础情绪类别）
 
         参数：
@@ -759,15 +760,15 @@ class EmotionRecognizer:
         返回值：
             dict 或 None: 复合情绪信息字典，包含：
                 - name (str): 复合情绪名称
+                - confidence (float): 复合情绪强度评分 (0-1)
+                - components (dict): 各组成情绪及其概率
                 - desc (str): 复合情绪描述
                 - advice (str): 针对性建议
+                - interpretation (str): 心理学解释
                 未检测到时返回 None
         """
         if not isinstance(probs_dict, dict):
             return None
-
-        # 复合情绪检测阈值：组成情绪概率需超过此值
-        COMPOUND_THRESHOLD = 0.10
 
         # 不参与复合情绪判断的情绪类别
         EXCLUDED_EMOTIONS = {"其他"}
@@ -777,34 +778,128 @@ class EmotionRecognizer:
 
         for compound_name, compound_info in COMPOUND_EMOTIONS.items():
             components = compound_info["components"]
-            # 检查所有组成情绪是否都超过阈值
-            all_present = True
-            component_score = 0.0
-            for comp_emotion in components:
-                # 跳过被排除的情绪类别
-                if comp_emotion in EXCLUDED_EMOTIONS:
-                    all_present = False
-                    break
-                prob = float(probs_dict.get(comp_emotion, 0.0))
-                if prob < COMPOUND_THRESHOLD:
-                    all_present = False
-                    break
-                component_score += prob
+            # 检查所有组成情绪是否都在排除列表外
+            if any(c in EXCLUDED_EMOTIONS for c in components):
+                continue
 
-            if all_present:
-                # 优先选择组成情绪总概率最高的复合情绪
-                if component_score > best_score:
-                    best_score = component_score
+            # 获取各组成情绪的概率
+            component_probs = []
+            for comp_emotion in components:
+                prob = float(probs_dict.get(comp_emotion, 0.0))
+                component_probs.append(prob)
+
+            # P1 升级：使用强度评分公式
+            if len(component_probs) > 0:
+                min_prob = min(component_probs)
+                mean_prob = sum(component_probs) / len(component_probs)
+                # co_activation_bonus: 所有组成情绪的概率乘积，反映"同时激活"程度
+                co_activation = 1.0
+                for p in component_probs:
+                    co_activation *= max(p, 0.01)  # 避免乘以0
+                co_activation_bonus = co_activation ** (1.0 / len(component_probs))  # 几何平均
+
+                compound_score = min_prob * 0.5 + mean_prob * 0.3 + co_activation_bonus * 0.2
+
+                if compound_score > best_score:
+                    best_score = compound_score
                     best_match = compound_name
 
-        if best_match:
+        # 只有当最佳得分超过最低阈值时才返回结果
+        if best_match and best_score > 0.05:
             info = COMPOUND_EMOTIONS[best_match]
+            component_details = {c: round(float(probs_dict.get(c, 0.0)), 4)
+                               for c in info["components"]}
             return {
                 "name": best_match,
+                "confidence": round(best_score, 4),
+                "components": component_details,
                 "desc": info["desc"],
-                "advice": info["advice"]
+                "advice": info["advice"],
+                "interpretation": f"由{'、'.join(info['components'])}组合而成，强度评分 {best_score:.2%}"
             }
         return None
+
+    def predict_dual_model(self, audio_path):
+        """
+        科研模式：使用 Base + Large 双模型进行交叉验证
+
+        使用当前模型作为主模型，同时使用另一个模型作为对照。
+        比较两者结果的一致性，输出模型规模敏感性评估。
+
+        参数：
+            audio_path (str): 音频文件路径
+
+        返回值：
+            dict: 包含双模型结果的综合评估字典
+        """
+        if not self.loaded:
+            return {"success": False, "error": "模型未加载"}
+
+        # 确定对照模型
+        if self.model_name == "emotion2vec_plus_large":
+            secondary_model = "emotion2vec_plus_base"
+        elif self.model_name == "emotion2vec_plus_base":
+            secondary_model = "emotion2vec_plus_large"
+        else:
+            secondary_model = "emotion2vec_plus_base"  # seed 使用 base 作为对照
+
+        # 主模型预测
+        primary_result = self.predict(audio_path)
+        if not primary_result.get('success'):
+            return {"success": False, "error": f"主模型预测失败: {primary_result.get('error')}"}
+
+        primary_result['model_name'] = self.model_name
+
+        # 加载对照模型并预测
+        try:
+            original_model = self.model_name
+            self.model = None
+            self.loaded = False
+            self.model_name = secondary_model
+            self.load_model()
+            # 等待加载完成（简化同步实现）
+            import time
+            waited = 0
+            while not self.loaded and waited < 60:
+                time.sleep(0.5)
+                waited += 0.5
+
+            if not self.loaded:
+                return {"success": False, "error": f"对照模型 {secondary_model} 加载失败"}
+
+            secondary_result = self.predict(audio_path)
+            secondary_result['model_name'] = secondary_model
+
+            # 恢复原模型
+            self.model = None
+            self.loaded = False
+            self.model_name = original_model
+            self.load_model()
+
+            # 评估模型一致性
+            from reliability import evaluate_model_agreement
+            agreement = evaluate_model_agreement(primary_result, secondary_result)
+
+            return {
+                "success": True,
+                "主要情绪": primary_result.get("主要情绪"),
+                "primary_result": primary_result,
+                "secondary_result": secondary_result,
+                "primary_model": self.model_name,
+                "secondary_model": secondary_model,
+                "model_agreement": agreement["agreement"],
+                "result_reliability": agreement["level"],
+                "model_agreement_note": agreement["note"],
+                "is_dual_model": True
+            }
+
+        except Exception as e:
+            logger.error(f"双模型预测失败: {e}")
+            # 至少返回主模型结果
+            primary_result['is_dual_model'] = True
+            primary_result['model_agreement'] = 0.0
+            primary_result['result_reliability'] = "低"
+            return primary_result
 
     def _generate_emotion_summary(self, main_emotion, confidence, mixed_emotions,
                                   compound_emotion, stability_score, stability_level):

@@ -497,3 +497,166 @@ class HistoryManager:
             int: 记录数量
         """
         return len(self.records)
+
+    # =========================================================================
+    # P1 新增：统计分析 API
+    # =========================================================================
+
+    def get_statistics(self):
+        """
+        获取历史记录的汇总统计
+
+        返回值：
+            dict: 包含各指标均值、标准差、极值的统计字典
+        """
+        if not self.records:
+            return {"record_count": 0}
+
+        records = self.records
+        n = len(records)
+
+        # 收集各指标
+        stability_scores = []
+        confidences = []
+        valence_scores = []
+        arousal_scores = []
+        dominance_scores = []
+        emotion_counts = {}
+        compound_counts = {}
+
+        for r in records:
+            try:
+                stability_scores.append(float(r.get('anxiety_score', 0)))
+                confidences.append(float(r.get('confidence', 0)))
+                valence_scores.append(float(r.get('valence_score', 0)))
+                arousal_scores.append(float(r.get('arousal_score', 0)))
+                dominance_scores.append(float(r.get('dominance_score', 0)))
+            except (TypeError, ValueError):
+                continue
+
+            emotion = r.get('main_emotion', '未知')
+            emotion_counts[emotion] = emotion_counts.get(emotion, 0) + 1
+
+            compound = r.get('compound_emotion', '')
+            if compound:
+                compound_counts[compound] = compound_counts.get(compound, 0) + 1
+
+        import numpy as np
+
+        return {
+            "record_count": n,
+            "stability": {
+                "mean": round(float(np.mean(stability_scores)), 2) if stability_scores else 0,
+                "std": round(float(np.std(stability_scores)), 2) if stability_scores else 0,
+                "min": round(float(np.min(stability_scores)), 2) if stability_scores else 0,
+                "max": round(float(np.max(stability_scores)), 2) if stability_scores else 0,
+            },
+            "confidence": {
+                "mean": round(float(np.mean(confidences)), 4) if confidences else 0,
+            },
+            "valence": {
+                "mean": round(float(np.mean(valence_scores)), 4) if valence_scores else 0,
+            },
+            "arousal": {
+                "mean": round(float(np.mean(arousal_scores)), 4) if arousal_scores else 0,
+            },
+            "dominance": {
+                "mean": round(float(np.mean(dominance_scores)), 4) if dominance_scores else 0,
+            },
+            "emotion_distribution": emotion_counts,
+            "compound_distribution": compound_counts,
+        }
+
+    def get_emotion_distribution(self):
+        """
+        获取情绪分布统计
+
+        返回值：
+            dict: 情绪名称 -> 出现次数
+        """
+        dist = {}
+        for r in self.records:
+            emo = r.get('main_emotion', '未知')
+            dist[emo] = dist.get(emo, 0) + 1
+        return dist
+
+    def get_stability_summary(self):
+        """
+        获取稳定度摘要（均值、标准差、趋势）
+
+        返回值：
+            dict: 稳定度统计摘要
+        """
+        if not self.records:
+            return {"mean": 0, "std": 0, "trend": "无数据"}
+
+        scores = []
+        for r in self.records:
+            try:
+                scores.append(float(r.get('anxiety_score', 0)))
+            except (TypeError, ValueError):
+                continue
+
+        if not scores:
+            return {"mean": 0, "std": 0, "trend": "无数据"}
+
+        import numpy as np
+        mean_val = float(np.mean(scores))
+        std_val = float(np.std(scores))
+
+        # 简单趋势判断（最近5条 vs 总体均值）
+        recent = scores[:min(5, len(scores))]
+        recent_mean = float(np.mean(recent)) if recent else mean_val
+        if recent_mean > mean_val + 1.0:
+            trend = "上升（情绪稳定性下降）"
+        elif recent_mean < mean_val - 1.0:
+            trend = "下降（情绪稳定性改善）"
+        else:
+            trend = "稳定"
+
+        return {
+            "mean": round(mean_val, 2),
+            "std": round(std_val, 2),
+            "recent_mean": round(recent_mean, 2),
+            "trend": trend,
+        }
+
+    def get_compound_emotion_stats(self):
+        """
+        获取复合情绪频次统计
+
+        返回值：
+            dict: 复合情绪名称 -> 出现次数
+        """
+        stats = {}
+        for r in self.records:
+            compound = r.get('compound_emotion', '')
+            if compound:
+                stats[compound] = stats.get(compound, 0) + 1
+        return stats
+
+    def export_records_csv(self, output_path):
+        """
+        导出历史记录为 CSV 文件（委托到 export_manager）
+
+        参数：
+            output_path (str): 输出文件路径
+
+        返回值：
+            bool: True 表示导出成功
+        """
+        from export_manager import export_records_csv as _export_csv
+        return _export_csv(self.get_records(), output_path)
+
+    def export_research_dataset(self, output_path):
+        """
+        导出完整研究数据集（委托到 export_manager）
+
+        参数：
+            output_path (str): 输出文件路径
+
+        返回值：
+            bool: True 表示导出成功
+        """
+        from export_manager import export_research_dataset as _export_json
+        return _export_json(self.get_records(), output_path)
