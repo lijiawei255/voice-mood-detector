@@ -792,25 +792,21 @@ class DataManagerDialog(QDialog):
 
 
 class DiagonalStripe(QWidget):
-    """构成主义对角线覆盖层 — 透明鼠标事件，绘制贯穿界面的X交叉斜线"""
+    """构成主义对角线覆盖层 — 单条粗斜线贯穿界面"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
     
     def paintEvent(self, event):
         p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
+        p.setRenderHint(QPainter.Antialiasing, False)
         w, h = self.width(), self.height()
-        # 主对角线：砖红色，3px
-        pen1 = QPen(QColor(196, 75, 79, 75))  # ~30% opacity
-        pen1.setWidth(3)
-        p.setPen(pen1)
-        p.drawLine(w - 5, 0, 5, h)
-        # 副对角线：炭黑色，2px
-        pen2 = QPen(QColor(43, 43, 43, 60))
-        pen2.setWidth(2)
-        p.setPen(pen2)
-        p.drawLine(w * 3 // 4, 0, w // 4, h)
+        # 单条贯穿对角线：砖红色，4px实线
+        pen = QPen(QColor(196, 75, 79, 90))
+        pen.setWidth(4)
+        pen.setCapStyle(Qt.FlatCap)
+        p.setPen(pen)
+        p.drawLine(0, 0, w, h)
         p.end()
 
 
@@ -1580,8 +1576,7 @@ class MainWindow(QMainWindow):
         btn_frame.setStyleSheet("""
             QFrame#bottomBtnFrame {
                 background-color: #C44B4F;
-                border: 3px solid #2B2B2B;
-                border-right: 8px solid #2B2B2B;
+                border: 4px solid #2B2B2B;
                 border-radius: 0px;
             }
         """)
