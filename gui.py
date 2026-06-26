@@ -45,6 +45,7 @@ from PyQt5.QtGui import QFont, QPalette, QColor, QDesktopServices, QPainter, QBr
 from recorder import AudioRecorder
 from emotion_recognizer import EmotionRecognizer
 from history_manager import HistoryManager
+from gui_widgets.result_cards import ResultCardWidget, DimensionBar
 from app_paths import (
     get_recordings_dir, get_log_file, get_temp_dir,
     get_cache_dir, get_user_data_dir, get_model_cache_dir,
@@ -1754,9 +1755,23 @@ class MainWindow(QMainWindow):
         self.duration_display.setObjectName("durationLabel")
         info_grid.addWidget(self.duration_display, 0, 1)
 
+        # P0 新增：录音质量实时反馈
+        quality_title = QLabel("录音质量")
+        quality_title.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
+        info_grid.addWidget(quality_title, 1, 0)
+        self.quality_feedback = QLabel("等待录音...")
+        self.quality_feedback.setFont(QFont("Microsoft YaHei", 10))
+        self.quality_feedback.setAlignment(Qt.AlignCenter)
+        self.quality_feedback.setMinimumHeight(28)
+        self.quality_feedback.setStyleSheet(
+            "background-color: #F7F5F2; border: 2px solid #D4CFC8; "
+            "padding: 4px; color: #8A8580;"
+        )
+        info_grid.addWidget(self.quality_feedback, 1, 1)
+
         progress_title = QLabel("处理进度")
         progress_title.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
-        info_grid.addWidget(progress_title, 1, 0)
+        info_grid.addWidget(progress_title, 2, 0)
 
         self.record_progress = QProgressBar()
         self.record_progress.setRange(0, 100)
@@ -1764,7 +1779,7 @@ class MainWindow(QMainWindow):
         self.record_progress.setObjectName("recordProgress")
         self.record_progress.setTextVisible(False)
         self.record_progress.setMinimumHeight(24)
-        info_grid.addWidget(self.record_progress, 1, 1)
+        info_grid.addWidget(self.record_progress, 2, 1)
 
         control_layout.addLayout(info_grid)
         left_layout.addWidget(control_group)
@@ -1791,6 +1806,11 @@ class MainWindow(QMainWindow):
         cards_layout.addWidget(self.compound_card)
 
         result_layout.addLayout(cards_layout)
+
+        # P0 新增：集成化科研评估报告卡片（VAD维度 + 稳定度分项 + 音频质量）
+        self.result_card_widget = ResultCardWidget()
+        self.result_card_widget.hide()
+        result_layout.addWidget(self.result_card_widget)
 
         # 分数说明
         stability_hint = QLabel("情绪稳定度分数越低表示情绪越稳定，0分最稳定，10分波动最大")
@@ -2595,6 +2615,38 @@ class MainWindow(QMainWindow):
         seconds = int(duration) % 60
         self.duration_display.setText(f"{minutes:02d}:{seconds:02d}")
 
+        # P0 新增：实时录音质量反馈
+        try:
+            volume = self.recorder.get_volume_level() if self.recorder else 0.0
+            if duration < 1.0:
+                self.quality_feedback.setText("正在录音...")
+                self.quality_feedback.setStyleSheet(
+                    "background-color: #F7F5F2; border: 2px solid #D4CFC8; "
+                    "padding: 4px; color: #8A8580;"
+                )
+            elif volume < 0.02:
+                self.quality_feedback.setText("⚠ 音量过低 — 请靠近麦克风")
+                self.quality_feedback.setStyleSheet(
+                    "background-color: #FFF3CD; border: 2px solid #F1C40F; "
+                    "padding: 4px; color: #856404; font-weight: bold;"
+                )
+            elif volume > 0.95:
+                self.quality_feedback.setText("⚠ 音量过高 — 可能爆音")
+                self.quality_feedback.setStyleSheet(
+                    "background-color: #FFF3CD; border: 2px solid #F1C40F; "
+                    "padding: 4px; color: #856404; font-weight: bold;"
+                )
+            else:
+                bar_len = int(volume * 12)
+                bar = "█" * bar_len + "░" * (12 - bar_len)
+                self.quality_feedback.setText(f"✓ 音量正常 {bar}")
+                self.quality_feedback.setStyleSheet(
+                    "background-color: #D4EDDA; border: 2px solid #27AE60; "
+                    "padding: 4px; color: #155724; font-weight: bold;"
+                )
+        except Exception:
+            pass
+
     @exception_safe()
     def on_recording_finished(self, output_path):
         self.is_recording = False
@@ -2713,9 +2765,33 @@ class MainWindow(QMainWindow):
 
                 result['audio_file'] = self.current_audio_path
 
+                # P0 新增：添加实验元数据（版本 + 模型名）
+                from main import APP_VERSION, ALGORITHM_VERSION
+                result['algorithm_version'] = ALGORITHM_VERSION
+                result['app_version'] = APP_VERSION
+                result['model_name'] = self.recognizer.model_name if self.recognizer else ''
+
+                # P0 新增：计算音频质量
+                from audio_quality import AudioQualityAnalyzer
+                try:
+                    analyzer = AudioQualityAnalyzer()
+                    audio_quality = analyzer.analyze(self.current_audio_path)
+                    if audio_quality:
+                        result['audio_quality'] = audio_quality
+                        result['assessment_reliability'] = (
+                            "高" if audio_quality.get('quality_score', 0) >= 0.6 else
+                            "中" if audio_quality.get('quality_score', 0) >= 0.4 else "低"
+                        )
+                except Exception:
+                    pass
+
                 self.score_card.set_value(f"{score:.1f}", color, "分")
                 self.level_card.set_value(level, color)
                 self.emotion_card.set_value(main_emotion, "#3498db", f"置信度 {confidence:.1%}")
+
+                # P0 新增：更新集成化评估报告卡片
+                self.result_card_widget.update_result(result)
+                self.result_card_widget.show()
 
                 # 复合情绪卡片展示
                 compound_emotion = result.get('复合情绪', '')

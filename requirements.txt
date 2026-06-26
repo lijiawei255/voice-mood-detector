@@ -13,6 +13,7 @@ pyaudio>=0.2.11
 librosa>=0.9.0
 soundfile>=0.12.0
 resampy>=0.4.0
+praat-parselmouth>=0.4.0
 
 # ----- AI 模型与推理 -----
 modelscope>=1.9.0
