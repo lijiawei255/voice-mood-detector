@@ -14,5 +14,11 @@ GUI 部件包 — 科研级评估报告卡片组件
 
 from .result_cards import ResultCardWidget, DimensionBar
 from .research_panel import ResearchRadarChart, ExportToolbar
+from .baseline_panel import BaselinePanel
+from .stats_panel import StatsPanel
 
-__all__ = ['ResultCardWidget', 'DimensionBar', 'ResearchRadarChart', 'ExportToolbar']
+__all__ = [
+    'ResultCardWidget', 'DimensionBar',
+    'ResearchRadarChart', 'ExportToolbar',
+    'BaselinePanel', 'StatsPanel',
+]
