@@ -191,12 +191,12 @@ class ResultCardWidget(QFrame):
         vad_label.setStyleSheet("color: #8A8580;")
         layout.addWidget(vad_label)
 
-        self.valence_bar = DimensionBar("效价", 0.0, -1.0, 1.0,
-                                        low_color="#C44B4F", high_color="#27AE60")
-        self.arousal_bar = DimensionBar("唤醒度", 0.0, 0.0, 1.0,
-                                        low_color="#3498DB", high_color="#E67E22")
-        self.dominance_bar = DimensionBar("掌控感", 0.0, 0.0, 1.0,
-                                          low_color="#95A5A6", high_color="#F1C40F")
+        self.valence_bar = DimensionBar("▸ 效价", 0.0, -1.0, 1.0,
+                                        low_color="#2B2B2B", high_color="#C44B4F")
+        self.arousal_bar = DimensionBar("▸ 唤醒度", 0.0, 0.0, 1.0,
+                                        low_color="#8A8580", high_color="#C44B4F")
+        self.dominance_bar = DimensionBar("▸ 掌控感", 0.0, 0.0, 1.0,
+                                          low_color="#8A8580", high_color="#2B2B2B")
 
         layout.addWidget(self.valence_bar)
         layout.addWidget(self.arousal_bar)

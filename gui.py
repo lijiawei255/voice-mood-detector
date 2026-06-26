@@ -1356,27 +1356,27 @@ class MainWindow(QMainWindow):
         guide_layout.setSpacing(10)
 
         # 使用流程 - 红色标题条
-        steps_title = QLabel("使用流程")
-        steps_title.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
-        steps_title.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 6px 12px; font-weight: bold;")
+        steps_title = QLabel("▸ 使用流程")
+        steps_title.setFont(QFont("Microsoft YaHei", 11, QFont.Black))
+        steps_title.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 8px 14px; font-weight: 900; border: 2px solid #2B2B2B;")
         guide_layout.addWidget(steps_title)
 
         steps_text = QLabel(
-            "<div style='line-height: 2.2; font-size: 10.5pt; color: #2B2B2B;'>"
-            "<div style='background: #F2EDE4; padding: 6px 12px; margin: 3px 0; border-left: 4px solid #C44B4F;'>"
-            "<b style='color: #C44B4F;'>1</b>\u3000等待模型加载完成"
+            "<div style='line-height: 2.4; font-size: 10.5pt; color: #2B2B2B;'>"
+            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 0px; border-left: 6px solid #C44B4F;'>"
+            "<b style='color: #FFF; background: #C44B4F; padding: 2px 8px; font-size: 13pt;'>1</b>　→ 等待模型加载完成"
             "</div>"
-            "<div style='background: #F2EDE4; padding: 6px 12px; margin: 3px 0; border-left: 4px solid #C44B4F;'>"
-            "<b style='color: #C44B4F;'>2</b>\u3000点击「开始录音」按钮"
+            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 24px; border-left: 6px solid #2B2B2B;'>"
+            "<b style='color: #FFF; background: #2B2B2B; padding: 2px 8px; font-size: 13pt;'>2</b>　→ 点击「开始录音」按钮"
             "</div>"
-            "<div style='background: #F2EDE4; padding: 6px 12px; margin: 3px 0; border-left: 4px solid #C44B4F;'>"
-            "<b style='color: #C44B4F;'>3</b>\u3000自然地说出您的感受（3-30秒）"
+            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 48px; border-left: 6px solid #C44B4F;'>"
+            "<b style='color: #FFF; background: #C44B4F; padding: 2px 8px; font-size: 13pt;'>3</b>　→ 说出您的感受（3-30秒）"
             "</div>"
-            "<div style='background: #F2EDE4; padding: 6px 12px; margin: 3px 0; border-left: 4px solid #C44B4F;'>"
-            "<b style='color: #C44B4F;'>4</b>\u3000点击「停止录音」按钮"
+            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 24px; border-left: 6px solid #2B2B2B;'>"
+            "<b style='color: #FFF; background: #2B2B2B; padding: 2px 8px; font-size: 13pt;'>4</b>　→ 点击「停止录音」按钮"
             "</div>"
-            "<div style='background: #F2EDE4; padding: 6px 12px; margin: 3px 0; border-left: 4px solid #C44B4F;'>"
-            "<b style='color: #C44B4F;'>5</b>\u3000查看情绪分析结果"
+            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 0px; border-left: 6px solid #C44B4F;'>"
+            "<b style='color: #FFF; background: #C44B4F; padding: 2px 8px; font-size: 13pt;'>5</b>　→ 查看情绪分析结果"
             "</div>"
             "</div>"
         )
@@ -1385,9 +1385,9 @@ class MainWindow(QMainWindow):
         guide_layout.addWidget(steps_text)
 
         # 功能说明
-        features_title = QLabel("功能说明")
-        features_title.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
-        features_title.setStyleSheet("color: #FFFFFF; background-color: #2B2B2B; padding: 6px 12px; font-weight: bold; margin-top: 8px;")
+        features_title = QLabel("▸ 功能说明")
+        features_title.setFont(QFont("Microsoft YaHei", 11, QFont.Black))
+        features_title.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 8px 14px; font-weight: 900; margin-top: 10px; border: 2px solid #2B2B2B;")
         guide_layout.addWidget(features_title)
 
         features_text = QLabel(

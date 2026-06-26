@@ -54,7 +54,7 @@ class ConstructivistBackground(QWidget):
         # 左上角大型砖红楔形（El Lissitzky式红色楔形 — 指向左下 / "击穿"感）
         p.setPen(Qt.NoPen)
         p.setBrush(QColor("#C44B4F"))
-        wedge_size = min(w, h) // 6
+        wedge_size = min(w, h) // 10
         wedge_tl = QPolygon([QPoint(0, 0), QPoint(wedge_size, 0), QPoint(0, wedge_size)])
         p.drawPolygon(wedge_tl)
 
@@ -66,7 +66,7 @@ class ConstructivistBackground(QWidget):
 
         # 左侧纵向红色装饰条（5px宽，从顶部三角延伸至底部1/3处）
         p.setBrush(QColor("#C44B4F"))
-        p.drawRect(0, wedge_size, 4, h // 3)
+        p.drawRect(0, wedge_size, 3, h // 5)
 
         # 底部红色装饰线（粗横条）
         p.setBrush(QColor("#C44B4F"))
