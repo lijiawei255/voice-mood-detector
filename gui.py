@@ -230,11 +230,11 @@ class WelcomeDialog(QDialog):
         tech_layout.setContentsMargins(20, 25, 20, 20)
         tech_text = QLabel(
             "<div style='line-height: 1.7; font-size: 11pt;'>"
-            "• <b>界面框架：</b>PyQt5<br>"
-            "• <b>AI推理：</b>PyTorch + ModelScope<br>"
-            "• <b>音频处理：</b>librosa + PyAudio<br>"
-            "• <b>数据可视化：</b>matplotlib<br>"
-            "• <b>便携模式：</b>所有数据保存在程序文件夹"
+            "■ <b>界面框架：</b>PyQt5<br>"
+            "■ <b>AI推理：</b>PyTorch + ModelScope<br>"
+            "■ <b>音频处理：</b>librosa + PyAudio<br>"
+            "■ <b>数据可视化：</b>matplotlib<br>"
+            "■ <b>便携模式：</b>所有数据保存在程序文件夹"
             "</div>"
         )
         tech_text.setWordWrap(True)
@@ -271,7 +271,7 @@ class WelcomeDialog(QDialog):
             "• 点击顶部菜单「文件 → 数据管理」，可以查看、删除历史记录<br>"
             "• 可以清除临时文件、日志、缓存等无用文件<br>"
             "• 您的录音和历史记录可以随时删除<br>"
-            "• <b>AI模型文件请不要删除</b>（约1GB，删除后需要重新下载）"
+            "■ <b>AI模型文件请不要删除</b>（约1GB，删除后需要重新下载）"
             "</div>"
         )
         tips_text.setWordWrap(True)
@@ -1176,7 +1176,7 @@ class MainWindow(QMainWindow):
 
         self.record_btn = QPushButton("■ 模型加载中...")
         self.record_btn.setFont(QFont("Microsoft YaHei", 22, QFont.Black))
-        self.record_btn.setMinimumHeight(130)
+        self.record_btn.setMinimumHeight(110)
         self.record_btn.setObjectName("recordBtn")
         self.record_btn.clicked.connect(self.toggle_recording)
         self.record_btn.setEnabled(False)
