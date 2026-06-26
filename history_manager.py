@@ -97,6 +97,8 @@ class HistoryManager:
         - emotion_level: 限制最长10字符
         - confidence: 限制在 0-1 范围
         - suggestion: 限制最长500字符
+        - compound_emotion: 复合情绪名称，限制最长20字符
+        - emotion_summary: 情绪分析摘要，限制最长500字符
 
         参数：
             record (dict): 待清洗的记录数据
@@ -123,6 +125,9 @@ class HistoryManager:
         except (TypeError, ValueError):
             sanitized['confidence'] = 0.0
         sanitized['suggestion'] = str(record.get('suggestion', ''))[:500]
+        # 新增字段（向后兼容：旧记录可能没有这些字段）
+        sanitized['compound_emotion'] = str(record.get('compound_emotion', ''))[:20]
+        sanitized['emotion_summary'] = str(record.get('emotion_summary', ''))[:500]
         return sanitized
 
     def add_record(self, result):
@@ -168,7 +173,9 @@ class HistoryManager:
                 "anxiety_score": score_f,
                 "emotion_level": emotion_level,
                 "confidence": conf_f,
-                "suggestion": str(result.get("suggestion_text", result.get("调节建议", "")))[:500]
+                "suggestion": str(result.get("suggestion_text", result.get("调节建议", "")))[:500],
+                "compound_emotion": str(result.get("复合情绪", ""))[:20],
+                "emotion_summary": str(result.get("情绪分析摘要", ""))[:500]
             }
             # 数据清洗
             record = self._sanitize_record(record)

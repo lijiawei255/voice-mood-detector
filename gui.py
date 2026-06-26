@@ -36,7 +36,8 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTabWidget, QGroupBox, QPushButton, QLabel, QProgressBar, QTextEdit,
     QListWidget, QSplitter, QFrame, QSizePolicy, QMessageBox, QFileDialog,
-    QMenuBar, QMenu, QAction, QGridLayout, QScrollArea, QDialog
+    QMenuBar, QMenu, QAction, QGridLayout, QScrollArea, QDialog, QComboBox,
+    QRadioButton, QButtonGroup
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize, QObject, QUrl
 from PyQt5.QtGui import QFont, QPalette, QColor, QDesktopServices
@@ -47,7 +48,8 @@ from history_manager import HistoryManager
 from app_paths import (
     get_recordings_dir, get_log_file, get_temp_dir,
     get_cache_dir, get_user_data_dir, get_model_cache_dir,
-    get_app_dir, get_storage_stats, safe_remove_file, is_safe_path
+    get_app_dir, get_storage_stats, safe_remove_file, is_safe_path,
+    load_model_config, save_model_config, is_model_downloaded
 )
 
 logging.basicConfig(
@@ -418,6 +420,7 @@ class WelcomeDialog(QDialog):
     def __init__(self, parent=None, is_first_run=True):
         super().__init__(parent)
         self.is_first_run = is_first_run
+        self.selected_model = load_model_config()
         self.setWindowTitle("欢迎使用语音情绪识别系统")
         self.setMinimumSize(700, 600)
         self.setup_ui()
@@ -451,24 +454,57 @@ class WelcomeDialog(QDialog):
         content_layout.addWidget(intro_text)
 
         if self.is_first_run:
-            model_group = QGroupBox("📦 关于AI模型")
+            model_group = QGroupBox("📦 选择AI模型")
             model_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
             model_layout = QVBoxLayout(model_group)
             model_layout.setContentsMargins(20, 25, 20, 20)
             model_text = QLabel(
                 "<div style='line-height: 1.7; font-size: 11pt;'>"
-                "<p><b>我们将使用开源的 emotion2vec_plus_large 模型</b></p>"
+                "<p><b>请选择要使用的 emotion2vec+ 模型：</b></p>"
                 "<p>• 来源：ModelScope 达摩院（阿里巴巴）</p>"
                 "<p>• 许可协议：Apache License 2.0（可免费使用）</p>"
-                "<p>• 模型大小：约 1GB</p>"
                 "<p style='color: #e67e22;'><b>⚠️ 重要提示：</b></p>"
                 "<p>首次使用需要下载模型，请确保网络连接正常。模型下载完成后，"
-                "以后启动程序就会很快啦！模型会保存在程序文件夹中，不会丢失。</p>"
+                "以后启动程序就会很快啦！模型会保存在程序文件夨中，不会丢失。</p>"
                 "</div>"
             )
             model_text.setWordWrap(True)
             model_text.setTextFormat(Qt.RichText)
             model_layout.addWidget(model_text)
+        
+            # 模型选择 ComboBox
+            model_select_label = QLabel("🤖 选择模型：")
+            model_select_label.setFont(QFont("Microsoft YaHei", 11))
+            model_layout.addWidget(model_select_label)
+        
+            self.model_combo = QComboBox()
+            self.model_combo.setFont(QFont("Microsoft YaHei", 11))
+            self.model_combo.setMinimumHeight(40)
+            self.model_combo.addItem("emotion2vec_plus_large — 大型模型 (~1GB) 精度最高【推荐】", "emotion2vec_plus_large")
+            self.model_combo.addItem("emotion2vec_plus_base — 基础模型 (~500MB) 速度与精度均衡", "emotion2vec_plus_base")
+            self.model_combo.addItem("emotion2vec_plus_seed — 最小模型 (~200MB) 速度最快", "emotion2vec_plus_seed")
+            self.model_combo.setStyleSheet("""
+                QComboBox {
+                    border: 2px solid #667eea;
+                    border-radius: 8px;
+                    padding: 8px 15px;
+                    background-color: white;
+                }
+                QComboBox:hover {
+                    border-color: #764ba2;
+                }
+                QComboBox::drop-down {
+                    border: none;
+                    padding-right: 10px;
+                }
+            """)
+            # 设置默认选中项
+            current_model = load_model_config()
+            for i in range(self.model_combo.count()):
+                if self.model_combo.itemData(i) == current_model:
+                    self.model_combo.setCurrentIndex(i)
+                    break
+            model_layout.addWidget(self.model_combo)
             content_layout.addWidget(model_group)
 
         tech_group = QGroupBox("🛠️ 技术栈")
@@ -568,7 +604,7 @@ class WelcomeDialog(QDialog):
                         stop:0 #764ba2, stop:1 #667eea);
                 }
             """)
-            start_btn.clicked.connect(self.accept)
+            start_btn.clicked.connect(self._on_start_clicked)
             btn_layout.addWidget(start_btn)
         else:
             close_btn = QPushButton("知道了")
@@ -593,13 +629,156 @@ class WelcomeDialog(QDialog):
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
 
+    def _on_start_clicked(self):
+        """首次运行时点击“开始使用”按钮的处理"""
+        if hasattr(self, 'model_combo'):
+            self.selected_model = self.model_combo.currentData()
+            save_model_config(self.selected_model)
+        self.accept()
+
     @staticmethod
     def is_model_downloaded():
-        from app_paths import get_model_cache_dir
-        model_dir = get_model_cache_dir()
-        target_model_dir = os.path.join(model_dir, 'models', 'iic', 'emotion2vec_plus_large')
-        return os.path.exists(target_model_dir) and os.path.exists(
-            os.path.join(target_model_dir, 'model.pt'))
+        """ 检查当前配置的模型是否已下载 """
+        current_model = load_model_config()
+        return is_model_downloaded(current_model)
+
+
+class ModelSwitchDialog(QDialog):
+    """
+    模型切换对话框类
+
+    允许用户在运行时切换不同的 emotion2vec+ 模型。
+    显示每个模型的信息、下载状态和当前使用状态。
+    """
+    def __init__(self, current_model_name, parent=None):
+        super().__init__(parent)
+        self.current_model = current_model_name
+        self.selected_model = current_model_name
+        self.setWindowTitle("🤖 切换AI模型")
+        self.setMinimumSize(550, 420)
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(15)
+        layout.setContentsMargins(25, 25, 25, 25)
+
+        title_label = QLabel("🤖 选择情绪识别模型")
+        title_label.setFont(QFont("Microsoft YaHei", 16, QFont.Bold))
+        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setStyleSheet("color: #667eea; margin-bottom: 5px;")
+        layout.addWidget(title_label)
+
+        desc_label = QLabel("选择不同的模型会影响识别精度和运行速度，切换后需要重新加载模型。")
+        desc_label.setFont(QFont("Microsoft YaHei", 10))
+        desc_label.setStyleSheet("color: #6c757d;")
+        desc_label.setWordWrap(True)
+        layout.addWidget(desc_label)
+
+        from emotion_recognizer import AVAILABLE_MODELS
+
+        self.btn_group = QButtonGroup(self)
+        models_info = [
+            ("emotion2vec_plus_large", "🌟 Large（大型模型）", "~1GB", "精度最高，推荐使用"),
+            ("emotion2vec_plus_base", "⭐ Base（基础模型）", "~500MB", "速度与精度均衡"),
+            ("emotion2vec_plus_seed", "⚡ Seed（最小模型）", "~200MB", "速度最快，适合低配置设备"),
+        ]
+
+        for model_name, display, size, desc in models_info:
+            downloaded = is_model_downloaded(model_name)
+            is_current = (model_name == self.current_model)
+
+            radio = QRadioButton()
+            radio.setProperty("model_name", model_name)
+            if is_current:
+                radio.setChecked(True)
+
+            # 构建卡片展示文本
+            status_text = "✅ 当前使用" if is_current else ("✔ 已下载" if downloaded else "⚠ 需要下载")
+            status_color = "#27ae60" if (is_current or downloaded) else "#e67e22"
+            radio.setText(f"{display}  |  大小: {size}  |  {desc}")
+            radio.setFont(QFont("Microsoft YaHei", 11))
+            radio.setMinimumHeight(50)
+            radio.setStyleSheet(f"""
+                QRadioButton {{
+                    padding: 12px 15px;
+                    border: 2px solid {'#667eea' if is_current else '#e9ecef'};
+                    border-radius: 10px;
+                    background-color: {'#f0f3ff' if is_current else 'white'};
+                }}
+                QRadioButton:hover {{
+                    border-color: #667eea;
+                    background-color: #f8f9ff;
+                }}
+            """)
+
+            self.btn_group.addButton(radio)
+            layout.addWidget(radio)
+
+            # 状态标签
+            status_label = QLabel(f"    {status_text}")
+            status_label.setFont(QFont("Microsoft YaHei", 9))
+            status_label.setStyleSheet(f"color: {status_color}; margin-left: 30px; margin-top: -5px;")
+            layout.addWidget(status_label)
+
+        layout.addStretch()
+
+        # 按钮区域
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        cancel_btn = QPushButton("取消")
+        cancel_btn.setFont(QFont("Microsoft YaHei", 11))
+        cancel_btn.setMinimumHeight(40)
+        cancel_btn.setMinimumWidth(100)
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #e9ecef;
+                color: #495057;
+                border: none;
+                border-radius: 8px;
+                padding: 8px 20px;
+            }
+            QPushButton:hover {
+                background-color: #dee2e6;
+            }
+        """)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        self.confirm_btn = QPushButton("✅ 确认切换")
+        self.confirm_btn.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
+        self.confirm_btn.setMinimumHeight(40)
+        self.confirm_btn.setMinimumWidth(140)
+        self.confirm_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #667eea, stop:1 #764ba2);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 8px 20px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #764ba2, stop:1 #667eea);
+            }
+        """)
+        self.confirm_btn.clicked.connect(self._on_confirm)
+        btn_layout.addWidget(self.confirm_btn)
+
+        layout.addLayout(btn_layout)
+
+    def _on_confirm(self):
+        """确认切换按钮处理"""
+        checked = self.btn_group.checkedButton()
+        if checked:
+            self.selected_model = checked.property("model_name")
+        self.accept()
+
+    def get_selected_model(self):
+        """获取用户选择的模型名"""
+        return self.selected_model
 
 
 class DataManagerDialog(QDialog):
@@ -931,6 +1110,8 @@ class MainWindow(QMainWindow):
     def _on_model_loaded_safe(self, success, error):
         if self._closing:
             return
+        # 重新启用模型切换按钮
+        self.model_switch_btn.setEnabled(True)
         if success:
             self._append_log_safe("✅ 情绪识别模型加载完成，准备就绪！")
             self.status_label.setText("● 准备就绪")
@@ -952,9 +1133,9 @@ class MainWindow(QMainWindow):
                 f"情绪识别模型加载失败:\n{error}\n\n"
                 "请检查：\n"
                 "1. 网络连接是否正常（首次需要下载模型）\n"
-                "2. 磁盘空间是否充足（约需要1GB）\n"
+                "2. 磁盘空间是否充足\n"
                 "3. 程序文件夹是否有写入权限\n\n"
-                "您可以尝试重启程序重新加载"
+                "您可以尝试重启程序或切换其他模型"
             )
 
     @exception_safe()
@@ -962,6 +1143,11 @@ class MainWindow(QMainWindow):
         self.append_log("系统启动中，正在准备界面...")
         self.append_log(f"程序目录: {get_app_dir()}")
         self.append_log(f"数据目录: {get_user_data_dir()}")
+
+        current_model = load_model_config()
+        from emotion_recognizer import AVAILABLE_MODELS
+        model_display = AVAILABLE_MODELS.get(current_model, {}).get('display', current_model)
+        self.append_log(f"当前选择模型: {model_display}")
         self.append_log("正在后台加载情绪识别模型，请稍候...")
         self.append_log("（首次使用需要下载模型，下载完成后下次启动会很快）")
 
@@ -970,7 +1156,7 @@ class MainWindow(QMainWindow):
                 if not self._closing:
                     self.model_progress_signal.emit(msg)
 
-            self.recognizer = EmotionRecognizer(progress_callback=on_progress)
+            self.recognizer = EmotionRecognizer(progress_callback=on_progress, model_name=current_model)
 
             def on_loaded(success, error):
                 if not self._closing:
@@ -1005,6 +1191,26 @@ class MainWindow(QMainWindow):
         title_label.setObjectName("headerTitle")
         header_layout.addWidget(title_label)
         header_layout.addStretch()
+
+        # 模型切换按钮
+        self.model_switch_btn = QPushButton("🤖 切换模型")
+        self.model_switch_btn.setFont(QFont("Microsoft YaHei", 10))
+        self.model_switch_btn.setCursor(Qt.PointingHandCursor)
+        self.model_switch_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255,255,255,0.2);
+                color: white;
+                border: 1px solid rgba(255,255,255,0.4);
+                border-radius: 15px;
+                padding: 6px 16px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255,255,255,0.3);
+                border-color: rgba(255,255,255,0.6);
+            }
+        """)
+        self.model_switch_btn.clicked.connect(self.show_model_switch_dialog)
+        header_layout.addWidget(self.model_switch_btn)
 
         self.status_label = QLabel("● 正在启动...")
         self.status_label.setFont(QFont("Microsoft YaHei", 12))
@@ -1046,6 +1252,78 @@ class MainWindow(QMainWindow):
     def show_data_manager(self, checked=False):
         dialog = DataManagerDialog(self)
         dialog.exec_()
+
+    @exception_safe()
+    def show_model_switch_dialog(self, checked=False):
+        """显示模型切换对话框，允许用户在运行时切换模型"""
+        if not self.recognizer:
+            QMessageBox.warning(self, "提示", "识别器未初始化，请稍候")
+            return
+        if self.is_recording or self.is_analyzing:
+            QMessageBox.warning(self, "提示", "请等当前录音/分析完成后再切换模型")
+            return
+        if self.recognizer.loading:
+            QMessageBox.warning(self, "提示", "模型正在加载中，请稍候")
+            return
+
+        current_model = self.recognizer.model_name
+        dialog = ModelSwitchDialog(current_model, self)
+        if dialog.exec_() == QDialog.Accepted:
+            target_model = dialog.get_selected_model()
+            if target_model == current_model and self.recognizer.loaded:
+                self.append_log("当前已是该模型，无需切换")
+                return
+            self._do_switch_model(target_model)
+
+    def _do_switch_model(self, target_model):
+        """执行模型切换逻辑"""
+        from emotion_recognizer import AVAILABLE_MODELS
+        model_info = AVAILABLE_MODELS.get(target_model, {})
+        model_display = model_info.get('display', target_model)
+        model_size = model_info.get('size', '未知')
+
+        # 检查目标模型是否已下载
+        if not is_model_downloaded(target_model):
+            reply = QMessageBox.question(
+                self, "模型下载确认",
+                f"模型 [{model_display}] 尚未下载。\n\n"
+                f"需要下载约 {model_size} 的模型文件，是否继续？\n"
+                f"（请确保网络连接正常）",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                self.append_log("用户取消模型切换")
+                return
+
+        # 开始切换
+        self.append_log(f"正在切换到模型 [{model_display}]...")
+        self.record_btn.setEnabled(False)
+        self.model_switch_btn.setEnabled(False)
+        self.status_label.setText("● 正在切换模型...")
+        self.status_label.setStyleSheet("color: #ffd700; background-color: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 20px;")
+
+        def on_progress(msg):
+            if not self._closing:
+                self.model_progress_signal.emit(msg)
+
+        # 确保进度回调生效
+        self.recognizer._progress_callbacks = [on_progress]
+
+        def on_switch_done(success, error):
+            if self._closing:
+                return
+            self.model_loaded_signal.emit(success, error or "")
+            if success:
+                # 更新底部版权标签
+                try:
+                    self.credit_label.setText(
+                        f"Powered by {target_model} (ModelScope/达摩院, Apache-2.0) | "
+                        "便携模式 - 数据保存在程序目录 | 仅供个人非商用参考使用"
+                    )
+                except Exception:
+                    pass
+
+        self.recognizer.switch_model(target_model, callback=on_switch_done)
 
     @exception_safe()
     def create_realtime_tab(self):
@@ -1345,15 +1623,16 @@ class MainWindow(QMainWindow):
 
         bottom_container.addWidget(btn_frame)
 
-        credit_label = QLabel(
-            "Powered by emotion2vec_plus_large (ModelScope/达摩院, Apache-2.0) | "
+        current_model = load_model_config()
+        self.credit_label = QLabel(
+            f"Powered by {current_model} (ModelScope/达摩院, Apache-2.0) | "
             "便携模式 - 数据保存在程序目录 | 仅供个人非商用参考使用"
         )
-        credit_label.setAlignment(Qt.AlignCenter)
-        credit_label.setFont(QFont("Microsoft YaHei", 8))
-        credit_label.setObjectName("creditLabel")
-        credit_label.setWordWrap(True)
-        bottom_container.addWidget(credit_label)
+        self.credit_label.setAlignment(Qt.AlignCenter)
+        self.credit_label.setFont(QFont("Microsoft YaHei", 8))
+        self.credit_label.setObjectName("creditLabel")
+        self.credit_label.setWordWrap(True)
+        bottom_container.addWidget(self.credit_label)
 
         parent_layout.addLayout(bottom_container)
 
@@ -2049,8 +2328,39 @@ class MainWindow(QMainWindow):
                 if mixed_emotions:
                     mixed_str = "、".join([f"{e}({p*100:.0f}%)" for e, p in mixed_emotions[:3]])
                     tips_text += f"，同时检测到混合情绪：{mixed_str}"
+
+                # 复合情绪展示
+                compound_emotion = result.get('复合情绪', '')
+                compound_detail = result.get('复合情绪详情', None)
+                if compound_emotion and compound_detail:
+                    tips_text += f"<br><b>🧠 复合情绪：</b>「{compound_emotion}」——{compound_detail.get('desc', '')}"
+
                 tips_text += f"<br><br><b>情绪稳定度：</b>{score:.1f}/10 分（分数越高表示情绪波动越大）<br><br>"
                 tips_text += f"<b>💡 调节建议：</b><br>{advice}"
+
+                # 获取分层建议（即时建议 + 长期建议）
+                from relaxation_tips import get_tips
+                tips_result = get_tips(
+                    main_emotion, score,
+                    compound_emotion=compound_emotion if compound_emotion else None,
+                    mixed_emotions=mixed_emotions
+                )
+
+                if tips_result.get('immediate'):
+                    tips_text += "<br><br><b>🎯 即时调节建议：</b><ul>"
+                    for tip in tips_result['immediate']:
+                        tips_text += f"<li>{tip}</li>"
+                    tips_text += "</ul>"
+
+                if tips_result.get('compound_advice'):
+                    tips_text += f"<br><b>🔗 复合情绪解读：</b>{tips_result['compound_advice']}"
+
+                if tips_result.get('long_term'):
+                    tips_text += "<br><br><b>🌱 长期建议：</b><ul>"
+                    for tip in tips_result['long_term']:
+                        tips_text += f"<li>{tip}</li>"
+                    tips_text += "</ul>"
+
                 tips_text += "</div>"
                 self.suggestion_text.setHtml(tips_text)
 
@@ -2059,7 +2369,7 @@ class MainWindow(QMainWindow):
                 result_copy['anxiety_score'] = score
                 self.history_manager.add_record(result_copy)
 
-                if score >= 6:
+                if score >= 6.5:
                     self.warning_label.show()
                     if score >= 8:
                         self.warning_label.setText("⚠️ 情绪波动较大！建议立即进行深呼吸放松，必要时寻求亲友陪伴或专业帮助")
@@ -2090,8 +2400,8 @@ class MainWindow(QMainWindow):
                     self.status_label.setText("● 情绪状态良好")
                     self.status_label.setStyleSheet("color: #a8ffb8; background-color: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 20px;")
 
-                self.append_log(f"分析完成 - 稳定度分数: {score:.1f}/10, 情绪状态: {level}, 主要情绪: {main_emotion}")
-                logger.info(f"分析完成 - 稳定度: {score:.1f}, 状态: {level}, 情绪: {main_emotion}")
+                self.append_log(f"分析完成 - 稳定度分数: {score:.1f}/10, 情绪状态: {level}, 主要情绪: {main_emotion}" + (f", 复合情绪: {compound_emotion}" if compound_emotion else ""))
+                logger.info(f"分析完成 - 稳定度: {score:.1f}, 状态: {level}, 情绪: {main_emotion}" + (f", 复合情绪: {compound_emotion}" if compound_emotion else ""))
             else:
                 error_msg = result.get('error', '未知错误')
                 QMessageBox.warning(self, "分析错误", f"情绪分析失败:\n{error_msg}")

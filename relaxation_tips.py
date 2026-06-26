@@ -29,7 +29,7 @@ TIPS = {
     "愤怒": [
         "做几次深呼吸：吸气4秒，屏住4秒，呼气6秒，重复3-5次",
         "暂时离开当前环境，找一个安静的地方冷静几分钟",
-        "喝一杯温水，慢慢品味水流过喉咙的感觉",
+        "喝一杯温水，慢慢品味水流过喉咛的感觉",
         "尝试从1数到10，给大脑一个缓冲的时间",
         "握紧拳头再慢慢松开，重复几次释放身体的紧张感",
         "去户外走走，让新鲜空气帮助平复心情"
@@ -51,6 +51,23 @@ TIPS = {
         "写日记，把内心的感受和想法记录下来",
         "联系一位关心你的朋友或家人，和他们聊聊天",
         "做一件简单的小事，比如泡一杯热茶，感受当下的美好"
+    ],
+    # 厌恶情绪调节建议
+    "厌恶": [
+        "试着远离让您不适的环境或事物，给自己一些空间",
+        "做几次深呼吸，让身体慢慢放松下来",
+        "去室外散散步，换一个环境让自己透透气",
+        "听一些舒缓的自然白噪音（雨声、海浪、鸟鸣）",
+        "整理一下周围环境，整洁的空间有助于缓解厌恶情绪",
+        "给自己做一顿喜欢的食物，通过味觉感受美好"
+    ],
+    # 惊讶情绪调节建议
+    "惊讶": [
+        "惊讶是短暂的情绪，给自己一点时间消化和适应",
+        "深呼吸几次，让心跳慢慢恢复平静",
+        "把发生的事情写下来，理清思绪有助于平复惊讶",
+        "和信任的人分享您的经历，交流可以帮助调适",
+        "尝试接受这种情绪，惊讶有时意味着新的机会"
     ],
     # 高压力/高焦虑状态调节建议
     "高压力": [
@@ -78,29 +95,112 @@ TIPS = {
     ]
 }
 
+# 复合情绪调节建议
+# 对应 emotion_recognizer.py 中定义的 COMPOUND_EMOTIONS
+COMPOUND_TIPS = {
+    "焦虑": [
+        "尝试4-7-8呼吸法：吸气4秒、屏息7秒、呼气8秒，重复3-5次",
+        "将担忧写在纸上，然后逝一列出可能的解决方案",
+        "做5分钟的身体扫描冥想，观察身体哪里感到紧绷",
+        "给自己设定一个“担忧时间”，每天固定10分钟集中处理担忧",
+        "慢跑或快走―20分钟，有氧运动能有效缓解焦虑"
+    ],
+    "挫败": [
+        "试着把目标分解成更小的步骤，完成每一小步都值得肯定",
+        "回顾过去兆服困难的经历，提醒自己你有能力应对",
+        "写下三件今天做得好的小事，让自己看到进步",
+        "跟信任的人聊聊你的困境，不同视角可能带来新解决方案",
+        "休息一下再继续，累的时候效率会大幅下降"
+    ],
+    "嫉妒": [
+        "试着列一个感恩清单，关注自己拥有的而非缺少的",
+        "记住：每个人都有自己的节奏，比较只会带来痛苦",
+        "将注意力转移到自身成长上，设定一个小目标并开始行动",
+        "进行“自我同情”练习：像对待好朋友一样对待自己"
+    ],
+    "紧张": [
+        "提前做好准备，充分的准备能大大减少紧张感",
+        "在心里“彩排”一遍即将发生的事情，让自己提前适应",
+        "握拳再放开，重复几次释放肩膀和手部的紧绷",
+        "告诉自己：适度紧张是正常的，它说明我在乎这件事",
+        "与其想着“不要紧张”，不如把注意力集中在具体行动上"
+    ],
+    "厌倦": [
+        "尝试一个新的小爱好或活动，给生活加点新鲜感",
+        "改变一下日常作息的小细节，比如走一条不同的路回家",
+        "找一本感兴趣的书或纪录片，探索新的知识领域",
+        "约朋友一起做一件之前没尝试过的事情"
+    ],
+    "愤恨": [
+        "运动是释放这种强烈情绪的最安全方式，试试跑步或拳击",
+        "把你的想法和感受写下来，不管多不理性都可以",
+        "暂时离开让你不适的人或环境，给自己冷静的时间",
+        "等情绪过去后再做决定，情绪激动时不宜做重要选择"
+    ]
+}
 
-def get_tips(emotion, anxiety_score):
+# 分层建议（长期建议）
+LONG_TERM_TIPS = {
+    "愤怒": [
+        "长期建议：培养规律的运动习惯，比如跑步或游泳，帮助稳定情绪",
+        "长期建议：学习非暴力沟通技巧，在情绪升起前表达需求"
+    ],
+    "恐惧": [
+        "长期建议：坚持每天冥想练习，可以显著降低焦虑基线水平",
+        "长期建议：考虑学习认知行为疗法(CBT)的自助技巧"
+    ],
+    "悲伤": [
+        "长期建议：建立稳定的社交支持网络，定期与亲友保持联系",
+        "长期建议：培养感恩习惯，每天记录三件值得感恩的事"
+    ],
+    "厌恶": [
+        "长期建议：学会设定健康的边界，保护自己的舒适区",
+        "长期建议：反思哪些触发因素是可以避免或改变的"
+    ],
+    "惊讶": [
+        "长期建议：培养心理弹性，接受生活中的不确定性是正常的"
+    ]
+}
+
+
+def get_tips(emotion, anxiety_score, compound_emotion=None, mixed_emotions=None):
     """
-    根据情绪类型和情绪稳定度分数，获取合适的调节建议
+    根据情绪状态获取分层调节建议（即时建议 + 长期建议）
 
     建议选择策略：
-    1. 如果情绪稳定度分数 >= 6（较高压力），添加高压力类建议
-    2. 如果是负面情绪（愤怒/恐惧/悲伤），添加对应情绪的建议
-    3. 如果是正面情绪（平静/开心）且压力不高，添加对应正向反馈
-    4. 兜底策略：如果以上都不匹配，根据压力水平选择高压力或平静建议
-    5. 从候选池中随机选取 1-3 条建议返回
+    1. 如果检测到复合情绪，优先添加复合情绪对应建议
+    2. 如果情绪稳定度分数 >= 6.5（较高压力），添加高压力类建议
+    3. 如果是负面情绪，添加对应情绪的建议
+    4. 如果是正面情绪且压力不高，添加正向反馈
+    5. 兆底策略：根据压力水平选择高压力或平静建议
+    6. 分数较高时额外添加长期建议
 
     参数：
-        emotion (str): 主要情绪类型（愤怒、恐惧、悲伤、平静、开心等）
-        anxiety_score (float): 情绪稳定度分数（0-10，越高表示越不稳定）
+        emotion (str): 主要情绪类型
+        anxiety_score (float): 情绪稳定度分数（0-10）
+        compound_emotion (str, 可选): 复合情绪名称（如 "焦虑"、"挫败"）
+        mixed_emotions (list, 可选): 混合情绪列表 [(情绪名, 概率), ...]
 
     返回值：
-        list: 随机选取的调节建议列表（1-3 条字符串）
+        dict: 包含分层建议的字典：
+            - immediate (list): 即时调节建议（1-3 条）
+            - long_term (list): 长期调节建议（0-2 条）
+            - compound_advice (str): 复合情绪专属建议（可能为空字符串）
     """
     tips_pool = []
+    long_term_pool = []
+    compound_advice = ""
+
+    # 复合情绪优先处理
+    if compound_emotion and compound_emotion in COMPOUND_TIPS:
+        tips_pool.extend(COMPOUND_TIPS[compound_emotion])
+        # 复合情绪专属建议从复合情绪定义中获取
+        from emotion_recognizer import COMPOUND_EMOTIONS
+        if compound_emotion in COMPOUND_EMOTIONS:
+            compound_advice = COMPOUND_EMOTIONS[compound_emotion].get("advice", "")
 
     # 高压力状态优先添加通用压力调节建议
-    if anxiety_score >= 6:
+    if anxiety_score >= 6.5:
         tips_pool.extend(TIPS["高压力"])
 
     # 添加对应情绪类型的建议（负面情绪）
@@ -108,18 +208,37 @@ def get_tips(emotion, anxiety_score):
         tips_pool.extend(TIPS[emotion])
 
     # 正面情绪且压力不高时，添加正向反馈
-    if emotion in ["平静", "开心"] and anxiety_score < 6:
+    if emotion in ["平静", "开心"] and anxiety_score < 6.5:
         tips_pool.extend(TIPS[emotion])
 
-    # 兜底策略：如果候选池为空
+    # 兆底策略
     if not tips_pool:
-        if anxiety_score >= 6:
+        if anxiety_score >= 6.5:
             tips_pool.extend(TIPS["高压力"])
         else:
             tips_pool.extend(TIPS["平静"])
 
-    # 随机选取 1-3 条建议（不超过候选池大小）
+    # 随机选取即时建议
     num_tips = random.randint(1, min(3, len(tips_pool)))
-    selected = random.sample(tips_pool, num_tips)
+    immediate = random.sample(tips_pool, num_tips)
 
-    return selected
+    # 长期建议（稳定度分数 >= 3.5 时提供）
+    if anxiety_score >= 3.5:
+        if emotion in LONG_TERM_TIPS:
+            long_term_pool.extend(LONG_TERM_TIPS[emotion])
+        # 混合情绪中的负面情绪也可能有长期建议
+        if mixed_emotions:
+            for emo, _ in mixed_emotions[:2]:
+                if emo in LONG_TERM_TIPS and emo != emotion:
+                    long_term_pool.extend(LONG_TERM_TIPS[emo])
+
+    long_term = []
+    if long_term_pool:
+        num_long = min(2, len(long_term_pool))
+        long_term = random.sample(long_term_pool, num_long)
+
+    return {
+        "immediate": immediate,
+        "long_term": long_term,
+        "compound_advice": compound_advice
+    }
