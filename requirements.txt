@@ -1,20 +1,36 @@
-PyQt5
-pyaudio
-librosa
-modelscope
-funasr
-torch
-torchaudio
-matplotlib
-numpy
-soundfile
-addict
-datasets
-simplejson
-sortedcontainers
-pygtrie
-scipy
-scikit-learn
-numba
-llvmlite
-resampy
+# ==============================================================================
+# 语音情绪识别系统 (Voice Mood Detector) - Python 依赖清单
+# ==============================================================================
+# 注意：建议使用 Python 3.8~3.11，推荐在虚拟环境中安装
+# 如果 PyAudio 安装失败，请使用: conda install pyaudio -y
+# ==============================================================================
+
+# ----- GUI 界面 -----
+PyQt5>=5.15.0
+
+# ----- 音频录制与处理 -----
+pyaudio>=0.2.11
+librosa>=0.9.0
+soundfile>=0.12.0
+resampy>=0.4.0
+
+# ----- AI 模型与推理 -----
+modelscope>=1.9.0
+funasr>=1.0.0
+torch>=1.13.0
+torchaudio>=0.13.0
+
+# ----- 数据处理与可视化 -----
+matplotlib>=3.5.0
+numpy>=1.21.0
+scipy>=1.7.0
+scikit-learn>=1.0.0
+
+# ----- 模型框架间接依赖 -----
+addict>=2.4.0
+datasets>=2.0.0
+simplejson>=3.17.0
+sortedcontainers>=2.4.0
+pygtrie>=2.5.0
+numba>=0.56.0
+llvmlite>=0.39.0

@@ -10,6 +10,7 @@ build/
 *.spec
 *.spec.bak
 *.manifest
+.pytest_cache/
 
 # 虚拟环境
 .venv/
@@ -18,6 +19,7 @@ env/
 ENV/
 
 # ==================== 项目数据（绝不提交） ====================
+# 便携模式用户数据目录（含录音、模型、日志、缓存等）
 portable_data/
 models/
 recordings/
@@ -27,6 +29,7 @@ logs/
 history.json
 history.json.bak
 history.json.corrupted
+model_config.json
 *.log
 
 # ==================== 音频文件 ====================
@@ -66,7 +69,10 @@ $RECYCLE.BIN/
 # Linux
 *~
 
+# ==================== 项目文档（非版本控制） ====================
+语音情绪识别系统升级建议.md
+
 # ==================== 测试/调试（可选提交） ====================
-# 如果需要提交测试文件，请注释掉以下行
+# 如需将测试文件纳入版本控制，请注释掉以下行
 test_*.py
 debug_*.py
