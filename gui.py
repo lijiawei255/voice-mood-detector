@@ -46,6 +46,7 @@ from recorder import AudioRecorder
 from emotion_recognizer import EmotionRecognizer
 from history_manager import HistoryManager
 from gui_widgets.result_cards import ResultCardWidget, DimensionBar
+from gui_widgets.research_panel import ResearchRadarChart, ExportToolbar
 from app_paths import (
     get_recordings_dir, get_log_file, get_temp_dir,
     get_cache_dir, get_user_data_dir, get_model_cache_dir,
@@ -1812,6 +1813,11 @@ class MainWindow(QMainWindow):
         self.result_card_widget.hide()
         result_layout.addWidget(self.result_card_widget)
 
+        # P1 新增：VAD 维度雷达图
+        self.radar_chart = ResearchRadarChart()
+        self.radar_chart.hide()
+        result_layout.addWidget(self.radar_chart)
+
         # 分数说明
         stability_hint = QLabel("情绪稳定度分数越低表示情绪越稳定，0分最稳定，10分波动最大")
         stability_hint.setFont(QFont("Microsoft YaHei", 10))
@@ -1988,6 +1994,12 @@ class MainWindow(QMainWindow):
         history_btn_layout.addWidget(record_count_label)
 
         layout.addLayout(history_btn_layout)
+
+        # P1 新增：数据导出工具栏
+        self.export_toolbar = ExportToolbar()
+        self.export_toolbar.export_csv_clicked.connect(self._on_export_csv)
+        self.export_toolbar.export_json_clicked.connect(self._on_export_json)
+        layout.addWidget(self.export_toolbar)
 
         splitter = QSplitter(Qt.Vertical)
         splitter.setObjectName("historySplitter")
@@ -2793,6 +2805,16 @@ class MainWindow(QMainWindow):
                 self.result_card_widget.update_result(result)
                 self.result_card_widget.show()
 
+                # P1 新增：更新 VAD 维度雷达图
+                self.radar_chart.update_values(
+                    valence=result.get('valence_score', 0.0),
+                    arousal=result.get('arousal_score', 0.0),
+                    dominance=result.get('dominance_score', 0.0),
+                    negative_load=result.get('negative_load', 0.0),
+                    uncertainty=result.get('emotional_uncertainty', 0.0)
+                )
+                self.radar_chart.show()
+
                 # 复合情绪卡片展示
                 compound_emotion = result.get('复合情绪', '')
                 compound_detail = result.get('复合情绪详情', None)
@@ -2914,6 +2936,36 @@ class MainWindow(QMainWindow):
             self.refresh_history()
             self.history_refresh_btn.setText("刷新列表")
             self.history_refresh_btn.setEnabled(True)
+
+    @exception_safe()
+    def _on_export_csv(self):
+        """导出历史记录为 CSV"""
+        path, _ = QFileDialog.getSaveFileName(
+            self, "导出 CSV 研究数据", "emotion_data.csv",
+            "CSV 文件 (*.csv);;所有文件 (*)"
+        )
+        if path:
+            success = self.history_manager.export_records_csv(path)
+            if success:
+                QMessageBox.information(self, "导出成功",
+                    f"数据已导出到:\n{path}\n\n格式: UTF-8 CSV (Excel/SPSS兼容)")
+            else:
+                QMessageBox.warning(self, "导出失败", "没有可导出的记录或导出过程出错")
+
+    @exception_safe()
+    def _on_export_json(self):
+        """导出历史记录为 JSON 研究数据集"""
+        path, _ = QFileDialog.getSaveFileName(
+            self, "导出 JSON 研究数据集", "emotion_research_data.json",
+            "JSON 文件 (*.json);;所有文件 (*)"
+        )
+        if path:
+            success = self.history_manager.export_research_dataset(path)
+            if success:
+                QMessageBox.information(self, "导出成功",
+                    f"完整研究数据集已导出到:\n{path}\n\n包含原始模型输出等全部字段")
+            else:
+                QMessageBox.warning(self, "导出失败", "没有可导出的记录或导出过程出错")
 
     @exception_safe()
     def refresh_history(self):

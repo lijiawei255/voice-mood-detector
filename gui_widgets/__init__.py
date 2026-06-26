@@ -8,8 +8,11 @@ GUI 部件包 — 科研级评估报告卡片组件
 组件：
 - ResultCardWidget: 集成化评估结果展示（含VAD维度、稳定度分项、音频质量）
 - DimensionBar: VAD 维度可视化指示条
+- ResearchRadarChart: VAD 维度雷达图
+- ExportToolbar: 数据导出工具栏
 """
 
 from .result_cards import ResultCardWidget, DimensionBar
+from .research_panel import ResearchRadarChart, ExportToolbar
 
-__all__ = ['ResultCardWidget', 'DimensionBar']
+__all__ = ['ResultCardWidget', 'DimensionBar', 'ResearchRadarChart', 'ExportToolbar']
