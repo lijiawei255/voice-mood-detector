@@ -1400,10 +1400,12 @@ class MainWindow(QMainWindow):
         self.score_card = ScoreCard("情绪稳定度 (0-10)")
         self.level_card = ScoreCard("情绪状态")
         self.emotion_card = ScoreCard("主要情绪")
+        self.compound_card = ScoreCard("复合情绪")
 
         cards_layout.addWidget(self.score_card)
         cards_layout.addWidget(self.level_card)
         cards_layout.addWidget(self.emotion_card)
+        cards_layout.addWidget(self.compound_card)
 
         result_layout.addLayout(cards_layout)
 
@@ -2290,6 +2292,14 @@ class MainWindow(QMainWindow):
                 self.level_card.set_value(level, color)
                 self.emotion_card.set_value(main_emotion, "#3498db", f"置信度 {confidence:.1%}")
 
+                # 复合情绪卡片展示
+                compound_emotion = result.get('复合情绪', '')
+                compound_detail = result.get('复合情绪详情', None)
+                if compound_emotion:
+                    self.compound_card.set_value(compound_emotion, "#9B59B6", compound_detail.get('desc', '')[:20] if compound_detail else "")
+                else:
+                    self.compound_card.set_value("未检测到", "#95A5A6", "情绪状态较单一")
+
                 from emotion_recognizer import STABILITY_LEVELS
                 border_color = color
                 bg_color = border_color + "15"
@@ -2329,9 +2339,7 @@ class MainWindow(QMainWindow):
                     mixed_str = "、".join([f"{e}({p*100:.0f}%)" for e, p in mixed_emotions[:3]])
                     tips_text += f"，同时检测到混合情绪：{mixed_str}"
 
-                # 复合情绪展示
-                compound_emotion = result.get('复合情绪', '')
-                compound_detail = result.get('复合情绪详情', None)
+                # 复合情绪展示（变量已在上方卡片区域定义）
                 if compound_emotion and compound_detail:
                     tips_text += f"<br><b>🧠 复合情绪：</b>「{compound_emotion}」——{compound_detail.get('desc', '')}"
 
