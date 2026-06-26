@@ -881,7 +881,7 @@ class MainWindow(QMainWindow):
             self._append_log_safe("情绪识别模型加载完成，准备就绪！")
             self.status_label.setText("● 准备就绪")
             self.status_label.setStyleSheet("color: #FFFFFF; background-color: #2B2B2B; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
-            self.record_btn.setText("点击开始录音")
+            self.record_btn.setText("● 点击开始录音")
             self.record_btn.setProperty("isRecording", "false")
             self.record_btn.style().unpolish(self.record_btn)
             self.record_btn.style().polish(self.record_btn)
@@ -1125,16 +1125,33 @@ class MainWindow(QMainWindow):
         left_layout.setSpacing(12)
         left_layout.setContentsMargins(5, 5, 5, 5)
 
-        control_group = QGroupBox("录音控制")
-        control_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
+        control_group = QGroupBox("■ 录音控制")
+        control_group.setFont(QFont("Microsoft YaHei", 12, QFont.Black))
         control_group.setObjectName("controlGroup")
+        control_group.setStyleSheet("""
+            QGroupBox#controlGroup {
+                border: 3px solid #2B2B2B;
+                border-top: 6px solid #C44B4F;
+                border-radius: 0px;
+                margin-top: 14px;
+                padding-top: 22px;
+                background-color: #F2EDE4;
+            }
+            QGroupBox#controlGroup::title {
+                subcontrol-origin: margin;
+                left: 20px;
+                padding: 2px 14px;
+                color: #C44B4F;
+                font-weight: 900;
+            }
+        """)
         control_layout = QVBoxLayout(control_group)
         control_layout.setSpacing(12)
         control_layout.setContentsMargins(20, 25, 20, 20)
 
-        self.record_btn = QPushButton("模型加载中...")
-        self.record_btn.setFont(QFont("Microsoft YaHei", 18, QFont.Bold))
-        self.record_btn.setMinimumHeight(100)
+        self.record_btn = QPushButton("● 模型加载中...")
+        self.record_btn.setFont(QFont("Microsoft YaHei", 22, QFont.Black))
+        self.record_btn.setMinimumHeight(130)
         self.record_btn.setObjectName("recordBtn")
         self.record_btn.clicked.connect(self.toggle_recording)
         self.record_btn.setEnabled(False)
@@ -1145,20 +1162,20 @@ class MainWindow(QMainWindow):
         info_grid.setSpacing(12)
         info_grid.setColumnStretch(1, 1)
 
-        duration_title = QLabel("录音时长")
-        duration_title.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
+        duration_title = QLabel("■ 录音时长")
+        duration_title.setFont(QFont("Microsoft YaHei", 11, QFont.Black))
         info_grid.addWidget(duration_title, 0, 0)
 
         self.duration_display = QLabel("00:00")
-        self.duration_display.setFont(QFont("Consolas", 22, QFont.Bold))
+        self.duration_display.setFont(QFont("Consolas", 28, QFont.Black))
         self.duration_display.setMinimumWidth(120)
         self.duration_display.setAlignment(Qt.AlignCenter)
         self.duration_display.setObjectName("durationLabel")
         info_grid.addWidget(self.duration_display, 0, 1)
 
         # P0 新增：录音质量实时反馈
-        quality_title = QLabel("录音质量")
-        quality_title.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
+        quality_title = QLabel("■ 录音质量")
+        quality_title.setFont(QFont("Microsoft YaHei", 11, QFont.Black))
         info_grid.addWidget(quality_title, 1, 0)
         self.quality_feedback = QLabel("等待录音...")
         self.quality_feedback.setFont(QFont("Microsoft YaHei", 10))
@@ -1170,8 +1187,8 @@ class MainWindow(QMainWindow):
         )
         info_grid.addWidget(self.quality_feedback, 1, 1)
 
-        progress_title = QLabel("处理进度")
-        progress_title.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
+        progress_title = QLabel("■ 处理进度")
+        progress_title.setFont(QFont("Microsoft YaHei", 11, QFont.Black))
         info_grid.addWidget(progress_title, 2, 0)
 
         self.record_progress = QProgressBar()
@@ -1185,9 +1202,26 @@ class MainWindow(QMainWindow):
         control_layout.addLayout(info_grid)
         left_layout.addWidget(control_group)
 
-        result_group = QGroupBox("检测结果")
-        result_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
+        result_group = QGroupBox("■ 检测结果")
+        result_group.setFont(QFont("Microsoft YaHei", 12, QFont.Black))
         result_group.setObjectName("resultGroup")
+        result_group.setStyleSheet("""
+            QGroupBox#resultGroup {
+                border: 3px solid #2B2B2B;
+                border-top: 6px solid #C44B4F;
+                border-radius: 0px;
+                margin-top: 14px;
+                padding-top: 22px;
+                background-color: #F2EDE4;
+            }
+            QGroupBox#resultGroup::title {
+                subcontrol-origin: margin;
+                left: 20px;
+                padding: 2px 14px;
+                color: #C44B4F;
+                font-weight: 900;
+            }
+        """)
         self.result_group = result_group
         result_layout = QVBoxLayout(result_group)
         result_layout.setSpacing(18)
@@ -1222,10 +1256,10 @@ class MainWindow(QMainWindow):
         result_layout.addWidget(self.radar_chart)
 
         # 分数说明
-        stability_hint = QLabel("情绪稳定度分数越低表示情绪越稳定，0分最稳定，10分波动最大")
-        stability_hint.setFont(QFont("Microsoft YaHei", 10))
+        stability_hint = QLabel("■ 分数越低越稳定 · 0分最稳定 · 10分波动最大")
+        stability_hint.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
         stability_hint.setAlignment(Qt.AlignCenter)
-        stability_hint.setStyleSheet("color: #8A8580; padding: 4px 0; font-weight: bold;")
+        stability_hint.setStyleSheet("color: #2B2B2B; padding: 6px 0; font-weight: bold; background: #E8E3DA; border: 1px solid #2B2B2B;")
         result_layout.addWidget(stability_hint)
 
         self.warning_label = QLabel("")
@@ -1237,8 +1271,9 @@ class MainWindow(QMainWindow):
         self.warning_label.hide()
         result_layout.addWidget(self.warning_label)
 
-        prob_title = QLabel("情绪概率分布")
-        prob_title.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
+        prob_title = QLabel("■ 情绪概率分布")
+        prob_title.setFont(QFont("Microsoft YaHei", 13, QFont.Black))
+        prob_title.setStyleSheet("color: #C44B4F; padding: 6px 0; font-weight: 900;")
         result_layout.addWidget(prob_title)
 
         self.prob_bars = {}
@@ -1427,9 +1462,26 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Vertical)
         splitter.setObjectName("historySplitter")
 
-        list_group = QGroupBox("历史记录")
-        list_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
+        list_group = QGroupBox("■ 历史记录")
+        list_group.setFont(QFont("Microsoft YaHei", 12, QFont.Black))
         list_group.setObjectName("historyGroup")
+        list_group.setStyleSheet("""
+            QGroupBox#historyGroup {
+                border: 3px solid #2B2B2B;
+                border-top: 6px solid #C44B4F;
+                border-radius: 0px;
+                margin-top: 14px;
+                padding-top: 22px;
+                background-color: #F2EDE4;
+            }
+            QGroupBox#historyGroup::title {
+                subcontrol-origin: margin;
+                left: 20px;
+                padding: 2px 14px;
+                color: #C44B4F;
+                font-weight: 900;
+            }
+        """)
         list_layout = QVBoxLayout(list_group)
         list_layout.setContentsMargins(15, 25, 15, 15)
         self.history_list = QListWidget()
@@ -1442,9 +1494,26 @@ class MainWindow(QMainWindow):
         list_layout.addWidget(self.history_list)
         splitter.addWidget(list_group)
 
-        plot_group = QGroupBox("情绪趋势图")
-        plot_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
+        plot_group = QGroupBox("■ 情绪趋势图")
+        plot_group.setFont(QFont("Microsoft YaHei", 12, QFont.Black))
         plot_group.setObjectName("plotGroup")
+        plot_group.setStyleSheet("""
+            QGroupBox#plotGroup {
+                border: 3px solid #2B2B2B;
+                border-top: 6px solid #C44B4F;
+                border-radius: 0px;
+                margin-top: 14px;
+                padding-top: 22px;
+                background-color: #F2EDE4;
+            }
+            QGroupBox#plotGroup::title {
+                subcontrol-origin: margin;
+                left: 20px;
+                padding: 2px 14px;
+                color: #C44B4F;
+                font-weight: 900;
+            }
+        """)
         plot_layout = QVBoxLayout(plot_group)
         plot_layout.setContentsMargins(15, 25, 15, 10)
 
@@ -1910,7 +1979,7 @@ class MainWindow(QMainWindow):
     def _reset_recording_ui(self):
         self.is_recording = False
         self.is_analyzing = False
-        self.record_btn.setText("点击开始录音")
+        self.record_btn.setText("● 点击开始录音")
         self.record_btn.setProperty("isRecording", "false")
         self.record_btn.style().unpolish(self.record_btn)
         self.record_btn.style().polish(self.record_btn)
@@ -2095,7 +2164,7 @@ class MainWindow(QMainWindow):
     @exception_safe()
     def on_recording_finished(self, output_path):
         self.is_recording = False
-        self.record_btn.setText("点击开始录音")
+        self.record_btn.setText("● 点击开始录音")
         self.record_btn.setProperty("isRecording", "false")
         self.record_btn.style().unpolish(self.record_btn)
         self.record_btn.style().polish(self.record_btn)

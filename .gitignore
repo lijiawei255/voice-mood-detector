@@ -93,6 +93,9 @@ debug_*.py
 # ==================== 截图与过程性内容（不提交） ====================
 screenshot_*.png
 *.shot.png
+eval_*.png
+eval*.png
+s_r*.png
 
 # ==================== AI 生成的过程文档（不提交） ====================
 docs/superpowers/
