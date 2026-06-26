@@ -15,6 +15,8 @@ Voice Mood Detector is a deep learning-based desktop application that records yo
 
 The system adopts a **portable mode** design — all user data (recordings, models, history, logs, etc.) is saved in the program folder. You can copy the entire program folder to migrate all data without polluting system directories.
 
+The UI follows **Soviet Constructivist** design principles: thick charcoal-black borders, brick-red accents (#C44B4F), 45° diagonal textures, triangular wedge decorations, pure geometry with no rounded corners, warm off-white industrial base (#F2EDE4), and asymmetrical card layouts.
+
 > ⚠️ **Disclaimer**: This software is for personal non-commercial reference only. The detection results are only an auxiliary reference for emotional state and do not constitute any medical diagnosis or advice. If you have persistent emotional distress, please consult a professional psychologist promptly.
 
 ---
