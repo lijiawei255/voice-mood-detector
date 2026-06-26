@@ -61,12 +61,15 @@ class MplCanvas(FigureCanvas):
             logger.warning(f"设置中文字体失败: {str(e)}")
 
     def _draw_background_zones(self):
-        """绘制稳定度背景色带 - 构成主义单色梯度"""
-        self.axes.axhspan(0, 2, alpha=0.06, color='#2B2B2B', zorder=0)
-        self.axes.axhspan(2, 4, alpha=0.04, color='#2B2B2B', zorder=0)
-        self.axes.axhspan(4, 6, alpha=0.06, color='#8A8580', zorder=0)
-        self.axes.axhspan(6, 8, alpha=0.08, color='#C44B4F', zorder=0)
-        self.axes.axhspan(8, 10, alpha=0.12, color='#C44B4F', zorder=0)
+        """绘制稳定度背景色带 — 构成主义几何分块（更明显的对比）"""
+        self.axes.axhspan(0, 2, alpha=0.08, color='#2B2B2B', zorder=0)
+        self.axes.axhspan(2, 4, alpha=0.05, color='#2B2B2B', zorder=0)
+        self.axes.axhspan(4, 6, alpha=0.08, color='#8A8580', zorder=0)
+        self.axes.axhspan(6, 8, alpha=0.10, color='#C44B4F', zorder=0)
+        self.axes.axhspan(8, 10, alpha=0.15, color='#C44B4F', zorder=0)
+        # 构成主义对角线：在图表底部绘制红色斜向强调线
+        self.axes.axline((0.1, 0.18), (0.9, 0.03), color='#C44B4F', linewidth=1.5,
+                        alpha=0.6, transform=self.axes.transAxes, zorder=0)
 
     def _draw_legend(self):
         """绘制图例 - 构成主义简洁风格"""
@@ -107,7 +110,7 @@ class MplCanvas(FigureCanvas):
                 self.axes.set_title("情绪稳定度变化趋势", fontsize=13, fontweight='bold', pad=12, loc='left')
                 self.axes.set_ylabel("情绪稳定度 (0-10)", fontsize=10, fontweight='bold', labelpad=10)
                 self.axes.set_ylim(0, 10)
-                self.axes.grid(True, alpha=0.3, linestyle='--', zorder=1)
+                self.axes.grid(True, alpha=0.4, linestyle='-', linewidth=1, zorder=1)
                 self._draw_background_zones()
                 self._draw_legend()
                 self.fig.tight_layout(pad=2.0)
@@ -131,14 +134,17 @@ class MplCanvas(FigureCanvas):
             self.fig.set_facecolor('#F2EDE4')
             self.axes.set_facecolor('#F2EDE4')
 
+            # 构成主义：图表顶部红色强调带（通过横跨色块）
+            self.axes.axhspan(9.5, 10.3, alpha=0.25, color='#C44B4F', zorder=2)
+
             # 背景色带
             self._draw_background_zones()
 
             # 绘制趋势线 - 构成主义工业风格：砖红线条+方块数据点
-            self.axes.plot(x, y, color='#C44B4F', linewidth=2, marker='s',
-                           markersize=5, markerfacecolor='#C44B4F',
-                           markeredgecolor='#2B2B2B', markeredgewidth=1,
-                           zorder=5)
+            self.axes.plot(x, y, color='#C44B4F', linewidth=2.5, marker='s',
+                           markersize=6, markerfacecolor='#C44B4F',
+                           markeredgecolor='#2B2B2B', markeredgewidth=1.5,
+                           zorder=5, solid_capstyle='round')
 
             # 数据点标签（仅 <= 20 个时显示）
             if n <= 20:
@@ -148,11 +154,14 @@ class MplCanvas(FigureCanvas):
                                       fontweight='bold', color='#2B2B2B', zorder=6)
 
             # x 轴标签：使用日期时间
-            self.axes.set_title("情绪稳定度变化趋势", fontsize=13, fontweight='bold', pad=12, loc='left')
-            self.axes.set_ylabel("情绪稳定度 (0-10)", fontsize=10, fontweight='bold', labelpad=10)
+            # 构成主义标题：红底白字风格（通过背景色块模拟）
+            self.axes.set_title("▮ 情绪稳定度变化趋势", fontsize=14, fontweight='bold', pad=15, loc='left',
+                               color='#2B2B2B')
+            self.axes.set_ylabel("稳定度 (0–10)", fontsize=10, fontweight='bold', labelpad=10,
+                               color='#2B2B2B')
             self.axes.set_ylim(-0.3, 10.3)
             self.axes.set_xlim(0.5, n + 0.5)
-            self.axes.grid(True, alpha=0.3, linestyle='--', zorder=1)
+            self.axes.grid(True, alpha=0.4, linestyle='-', linewidth=1, zorder=1)
 
             # 设置 x 轴刻度
             if n <= 15:

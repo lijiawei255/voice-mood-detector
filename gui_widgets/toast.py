@@ -11,8 +11,7 @@ Toast 通知组件模块
 """
 
 from PyQt5.QtWidgets import (
-    QFrame, QHBoxLayout, QVBoxLayout, QLabel, QPushButton,
-    QGraphicsDropShadowEffect
+    QFrame, QHBoxLayout, QVBoxLayout, QLabel, QPushButton
 )
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QColor, QPainter, QBrush, QPainterPath
@@ -104,12 +103,7 @@ class ToastNotification(QFrame):
             }}
         """)
 
-        # 硬阴影效果 - 构成主义风格
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(0)
-        shadow.setColor(QColor(43, 43, 43, 60))
-        shadow.setOffset(3, 3)
-        self.setGraphicsEffect(shadow)
+        # 构成主义风格：无阴影，纯平面，用粗边框强化层次
 
         self.adjustSize()
 

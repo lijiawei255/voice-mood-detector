@@ -77,7 +77,7 @@ class ConstructivistBackground(QWidget):
         p.drawRect(w - 2, h // 5, 2, h * 2 // 3)
 
         # 大幅面斜穿红色半透明条（构成主义标志性斜向动势） — 提高不透明度
-        p.setBrush(QColor(196, 75, 79, 55))  # #C44B4F 约22%透明度
+        p.setBrush(QColor(196, 75, 79, 90))  # #C44B4F 约35%透明度 — 更明显
         p.setPen(Qt.NoPen)
         stripe_width = 120
         diag_stripe = QPolygon([
@@ -88,7 +88,7 @@ class ConstructivistBackground(QWidget):
         ])
         p.drawPolygon(diag_stripe)
         # 第二道斜向条（反向，炭黑色，更宽）
-        p.setBrush(QColor(43, 43, 43, 35))
+        p.setBrush(QColor(43, 43, 43, 60))
         stripe2 = QPolygon([
             QPoint(0, h * 5 // 8),
             QPoint(0, h * 5 // 8 + 80),

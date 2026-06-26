@@ -1640,9 +1640,9 @@ class MainWindow(QMainWindow):
         QGroupBox {
             border: 3px solid #2B2B2B;
             border-radius: 0px;
-            margin-top: 12px;
-            padding-top: 20px;
-            background-color: rgba(242, 237, 228, 220);
+            margin-top: 14px;
+            padding-top: 22px;
+            background-color: #F2EDE4;
             font-family: "Microsoft YaHei", "SimHei", "Arial Black";
             font-weight: bold;
         }
@@ -1650,9 +1650,10 @@ class MainWindow(QMainWindow):
         QGroupBox::title {
             subcontrol-origin: margin;
             left: 20px;
-            padding: 0 12px;
-            color: #2B2B2B;
-            font-weight: bold;
+            padding: 2px 14px;
+            color: #C44B4F;
+            font-weight: 900;
+            background-color: #F2EDE4;
         }
 
         #recordBtn {
@@ -1772,7 +1773,8 @@ class MainWindow(QMainWindow):
 
         #historyList::item {
             padding: 12px 15px;
-            border-bottom: 1px solid #8A8580;
+            border-bottom: 2px solid #2B2B2B;
+            border-left: 5px solid transparent;
             border-radius: 0px;
             margin: 2px 0;
         }
@@ -1780,11 +1782,13 @@ class MainWindow(QMainWindow):
         #historyList::item:selected {
             background-color: #2B2B2B;
             color: white;
+            border-left: 5px solid #C44B4F;
         }
 
         #historyList::item:hover:!selected {
             background-color: #E8E3DA;
             color: #2B2B2B;
+            border-left: 5px solid #8A8580;
         }
 
         #countLabel {
