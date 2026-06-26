@@ -1325,7 +1325,7 @@ class MainWindow(QMainWindow):
 
             bar = QProgressBar()
             bar.setRange(0, 100)
-            bar.setValue(8)  # 默认8% — 清晰可见的红色几何条
+            bar.setValue(10)  # 默认10% — 空态下清晰可见
             bar.setTextVisible(False)
             bar.setObjectName(f"probBar_{emotion}")
             bar.setMinimumHeight(32)
@@ -1628,7 +1628,7 @@ class MainWindow(QMainWindow):
             f"■ {current_model}  |  Apache-2.0  |  仅供个人参考"
         )
         self.credit_label.setAlignment(Qt.AlignCenter)
-        self.credit_label.setFont(QFont("Microsoft YaHei", 9, QFont.Bold))
+        self.credit_label.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
         self.credit_label.setObjectName("creditLabel")
         self.credit_label.setWordWrap(True)
         bottom_container.addWidget(self.credit_label)
