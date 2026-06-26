@@ -3,24 +3,32 @@
 语音情绪识别系统 - 情绪识别核心模块
 
 本模块是整个系统的核心，负责加载 AI 模型并进行语音情绪识别。
-使用 ModelScope / FunASR 加载 emotion2vec_plus_large 预训练模型，
+使用 ModelScope / FunASR 加载 emotion2vec+ 系列预训练模型，
 对音频文件进行推理，识别其中的情绪状态。
 
 主要功能：
 1. 单例模式的情绪识别器（全局唯一实例，避免重复加载模型）
 2. 异步模型加载（不阻塞 GUI 线程）
-3. 多情绪分类（平静、开心、惊讶、悲伤、愤怒、恐惧、厌恶等）
-4. 情绪稳定度评分计算（0-10 分，越高越不稳定）
-5. 混合情绪检测
-6. 个性化调节建议生成
-7. 线程安全的状态管理
+3. 多模型支持（seed/base/large 三种规格，可动态切换）
+4. 8 种基础情绪分类（愤怒、厌恶、恐惧、开心、平静、其他、悲伤、惊讶）
+5. 多因子情绪稳定度评分（负面情绪权重 + Shannon 熵 + 极端度）
+6. 复合情绪模式识别（焦虑、挫败、嫉妒、紧张、厌倦、愤恨）
+7. 混合情绪检测（概率 > 8% 的并存情绪）
+8. 个性化调节建议生成（分级建议策略）
+9. 线程安全的状态管理
 
 模型信息：
-- 模型名称：emotion2vec_plus_large
-- 模型来源：ModelScope (阿里达摩院)
+- 模型系列：emotion2vec+ (seed / base / large)
+- 模型来源：ModelScope (阿里达摩院 DAMO Academy)
 - 模型许可证：Apache License 2.0
-- 模型大小：约 300MB 参数
 - 支持分类：angry, disgusted, fearful, happy, neutral, other, sad, surprised
+- 输入要求：16kHz 单声道 WAV 音频
+- 推理方式：强制 CPU 推理，确保所有设备均可运行
+
+算法原理：
+- 稳定度评分：三因子加权模型（负面情绪权重 40% + 熵值 30% + 极端度 30%）
+- 复合情绪：基于基础情绪组合模式 + 概率阈值触发
+- 混合情绪：概率 > 8% 的非主要情绪自动检测
 
 作者：Jiawei Li
 许可证：GPL v3
@@ -50,12 +58,29 @@ os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
+# ===========================================================================
 # 常量定义
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# 以下常量定义了情绪识别系统的核心配置，包括：
+# - 可用模型列表及元信息
+# - 模型输出标签到统一中文标签的映射表
+# - 情绪分类（正面/负面/中性）
+# - 各情绪对稳定度的影响权重（基于心理学情绪维度理论）
+# - 复合情绪模式定义（基于心理学情绪组合理论）
+# - 稳定度等级定义与显示颜色
+# - 稳定度计算中各因子的权重配置
+# ===========================================================================
+
+# 可用模型列表及其元信息（按规模从小到大排列）
+AVAILABLE_MODELS = {
+    "emotion2vec_plus_seed": {"display": "Seed（最小模型）", "size": "~200MB", "desc": "速度最快，适合低配置设备"},
+    "emotion2vec_plus_base": {"display": "Base（基础模型）", "size": "~500MB", "desc": "速度与精度均衡"},
+    "emotion2vec_plus_large": {"display": "Large（大型模型）", "size": "~1GB", "desc": "精度最高，推荐使用"},
+}
 
 # 模型原始标签到统一中文标签的映射表
-# emotion2vec 模型可能返回中英文混合的标签，这里统一映射为中文
+# emotion2vec+ 模型可能返回中英文混合的标签（如 'angry'/'生气'/'愤怒' 都指同一情绪）
+# 此映射表将所有可能的标签变体统一为 8 种标准中文标签
 LABEL_MAPPING = {
     # 愤怒
     '生气': '愤怒',
@@ -93,24 +118,65 @@ LABEL_MAPPING = {
     '<unk>': '其他'
 }
 
-# 负面情绪列表（用于稳定度计算的权重依据）
+# 情绪分类列表（基于心理学情绪维度理论）
+# 负面情绪：对情绪稳定度有负面影响，权重用于稳定度计算
 NEGATIVE_EMOTIONS = ['愤怒', '厌恶', '恐惧', '悲伤']
-# 正面情绪列表
+# 正面情绪：对稳定度无负面贡献，且可抑制极端度得分
 POSITIVE_EMOTIONS = ['开心']
-# 中性情绪列表
+# 中性情绪：不直接影响稳定度核心得分
 NEUTRAL_EMOTIONS = ['平静', '惊讶', '其他']
 
 # 各情绪对情绪稳定度的影响权重（0-1）
-# 权重越高表示该情绪越容易导致情绪不稳定
+# 权重设计依据：基于情绪的唤醒度（arousal）和效价（valence）维度
+# 高唤醒 + 负效价 = 高不稳定权重（如恐惧 0.95、愤怒 0.90）
+# 低唤醒 + 负效价 = 中等权重（如悲伤 0.80）
+# 正效价/中性 = 零权重
 EMOTION_WEIGHTS = {
-    "愤怒": 0.85,    # 愤怒：较高权重
-    "厌恶": 0.75,    # 厌恶：中高权重
-    "恐惧": 1.0,     # 恐惧：最高权重（最能反映不稳定）
-    "悲伤": 0.90,    # 悲伤：高权重
-    "惊讶": 0.25,    # 惊讶：低权重（短暂波动）
-    "开心": 0.0,     # 开心：无负面影响
-    "平静": 0.0,     # 平静：无负面影响
-    "其他": 0.10     # 其他：轻微权重
+    "愤怒": 0.90,    # 愤怒：高激活负面情绪
+    "厌恶": 0.70,    # 厌恶：中等负面影响
+    "恐惧": 0.95,    # 恐惧：高唤醒度，最不稳定
+    "悲伤": 0.80,    # 悲伤：低激活但持续影响
+    "惊讶": 0.30,    # 惊讶：短暂激活
+    "开心": 0.0,     # 正面情绪无负面贡献
+    "平静": 0.0,     # 中性无贡献
+    "其他": 0.15     # 未识别轻微贡献
+}
+
+# 复合情绪模式定义
+# 基于心理学情绪组合理论：复合情绪由多个基础情绪在特定模式下组合而成
+# 当所有组成情绪的概率均超过阈值（COMPOUND_THRESHOLD=10%）时触发检测
+# 多个复合情绪同时满足时，选择组成情绪总概率最高的作为最终结果
+COMPOUND_EMOTIONS = {
+    "焦虑": {
+        "components": ["恐惧", "悲伤"],
+        "desc": "恐惧与悲伤交织，表现为对未来的不确定感和持续担忧",
+        "advice": "焦虑是恐惧和悲伤的复合体，建议通过正念呼吸和渐进式肌肉放松来缓解"
+    },
+    "挫败": {
+        "components": ["愤怒", "悲伤"],
+        "desc": "愤怒与悲伤并存，通常源于期望落空或目标受阻",
+        "advice": "挫败感说明您对某事有期待，建议将大目标拆分为小步骤，逐步推进"
+    },
+    "嫉妒": {
+        "components": ["愤怒", "悲伤", "恐惧"],
+        "desc": "愤怒、悲伤和恐惧的三重交织，涉及对自身地位的不安",
+        "advice": "这种复杂情绪需要自我接纳，建议关注自身成长而非与他人比较"
+    },
+    "紧张": {
+        "components": ["恐惧", "惊讶"],
+        "desc": "恐惧伴随警觉状态，面对未知挑战时的应激反应",
+        "advice": "适度紧张有助于提升表现，建议通过准备和模拟来增加掌控感"
+    },
+    "厌倦": {
+        "components": ["厌恶", "悲伤"],
+        "desc": "厌恶与悲伤的结合，通常源于长期重复或缺乏意义感",
+        "advice": "厌倦可能是需要变化的信号，试着为日常生活增添新的元素"
+    },
+    "愤恨": {
+        "components": ["愤怒", "厌恶"],
+        "desc": "愤怒叠加厌恶，强烈的排斥和对抗情绪",
+        "advice": "这种强烈情绪需要安全释放，建议通过运动或书写来疏导"
+    },
 }
 
 # 情绪稳定度等级定义（分数区间 → 等级名称 + 显示颜色）
@@ -121,6 +187,18 @@ STABILITY_LEVELS = {
     "轻度波动": "#E67E22",   # 橙色
     "不稳定": "#E74C3C",     # 红色
     "情绪激烈": "#8B0000"    # 深红
+}
+
+# 稳定度计算中各因子的权重
+# 综合公式：final = negative_weight * 0.40 + entropy * 0.30 + extremity * 0.30
+# 三因子设计依据：
+# - 负面情绪权重：直接反映负面情绪的强度
+# - Shannon 熵：反映情绪分布的混乱程度，高熵=多情绪并存=心理冲突
+# - 极端度：检测单一负面情绪的极端高概率状态
+STABILITY_FACTOR_WEIGHTS = {
+    "negative_weight": 0.40,   # 负面情绪加权分数权重
+    "entropy": 0.30,           # 情绪分散度（Shannon 熵）权重
+    "extremity": 0.30          # 情绪极端度权重
 }
 
 
@@ -198,7 +276,7 @@ class EmotionRecognizer:
                 cls._instance._initialized = False
             return cls._instance
 
-    def __init__(self, progress_callback=None):
+    def __init__(self, progress_callback=None, model_name=None):
         """
         初始化情绪识别器
 
@@ -208,6 +286,7 @@ class EmotionRecognizer:
         参数：
             progress_callback (callable, 可选): 模型加载进度回调函数，
                 接受一个字符串参数表示当前进度消息
+            model_name (str, 可选): 要加载的模型名称，默认从配置文件读取
         """
         if self._initialized:
             # 已初始化，仅添加新的回调（如果有）
@@ -220,6 +299,9 @@ class EmotionRecognizer:
         self.loaded = False         # 是否已加载完成
         self.loading = False        # 是否正在加载中
         self.error = None           # 加载错误信息
+        # 模型名称（从配置文件读取或使用参数指定）
+        from app_paths import load_model_config
+        self.model_name = model_name or load_model_config()
         # 进度回调列表（支持多个回调）
         self._progress_callbacks = []
         if progress_callback:
@@ -298,6 +380,16 @@ class EmotionRecognizer:
             except Exception:
                 pass
 
+    @classmethod
+    def reset_instance(cls):
+        """
+        重置单例实例（用于模型切换时重新创建实例）
+
+        调用后下次实例化将创建新的 EmotionRecognizer 实例。
+        """
+        with cls._lock:
+            cls._instance = None
+
     def load_model(self, callback=None):
         """
         加载情绪识别模型（异步）
@@ -351,7 +443,7 @@ class EmotionRecognizer:
             try:
                 from app_paths import get_model_cache_dir
                 model_cache_dir = get_model_cache_dir()
-                target_model_dir = os.path.join(model_cache_dir, 'models', 'iic', 'emotion2vec_plus_large')
+                target_model_dir = os.path.join(model_cache_dir, 'models', 'iic', self.model_name)
                 # 如果模型已存在，先修复其 requirements.txt
                 if os.path.exists(target_model_dir):
                     self._fix_requirements_file(target_model_dir)
@@ -359,22 +451,20 @@ class EmotionRecognizer:
                 self._report_progress("正在导入模型库...")
                 from funasr import AutoModel
 
-                self._report_progress("正在加载情绪识别模型（首次使用需要下载，之后启动会很快）...")
+                model_display = AVAILABLE_MODELS.get(self.model_name, {}).get('display', self.model_name)
+                self._report_progress(f"正在加载情绪识别模型 [{model_display}]（首次使用需要下载，之后启动会很快）...")
                 # 使用 FunASR 的 AutoModel 加载模型
                 self.model = AutoModel(
-                    model="iic/emotion2vec_plus_large",
+                    model=f"iic/{self.model_name}",
                     disable_pbar=True,       # 禁用进度条
                     disable_log=True,        # 禁用详细日志
                     # 优先使用 GPU，没有则使用 CPU
-                    device="cuda:0" if torch.cuda.is_available() else "cpu"
+                    device="cpu"  # 强制使用CPU推理，确保所有电脑均可运行
                 )
 
-                if torch.cuda.is_available():
-                    self._report_progress("检测到GPU，启用CUDA加速...")
-                else:
-                    self._report_progress("使用CPU进行推理...")
+                self._report_progress("使用CPU进行推理...")
 
-                self._report_progress("模型加载完成！")
+                self._report_progress(f"模型 [{model_display}] 加载完成！")
                 self.loaded = True
                 self.error = None
                 if callback:
@@ -402,15 +492,69 @@ class EmotionRecognizer:
         thread.start()
         return False
 
+    def switch_model(self, model_name, callback=None):
+        """
+        切换到指定模型
+
+        如果目标模型与当前模型相同且已加载，直接返回成功。
+        否则卸载当前模型，加载新模型。
+
+        参数：
+            model_name (str): 目标模型名称
+            callback (callable, 可选): 加载完成回调，签名为 callback(success, error)
+
+        返回值：
+            bool: True 表示已立即完成（相同模型），False 表示正在异步加载
+        """
+        # 验证模型名称有效性
+        if model_name not in AVAILABLE_MODELS:
+            if callback:
+                try:
+                    callback(False, f"无效的模型名称: {model_name}")
+                except Exception:
+                    pass
+            return False
+
+        # 如果相同模型已加载，直接返回
+        if model_name == self.model_name and self.loaded:
+            if callback:
+                try:
+                    callback(True, None)
+                except Exception:
+                    pass
+            return True
+
+        # 如果正在加载，不允许切换
+        if self.loading:
+            if callback:
+                try:
+                    callback(False, "模型正在加载中，请稍后再试")
+                except Exception:
+                    pass
+            return False
+
+        # 清理当前模型
+        logger.info(f"切换模型: {self.model_name} -> {model_name}")
+        self.model = None
+        self.loaded = False
+        self.error = None
+        self.model_name = model_name
+
+        # 持久化配置
+        from app_paths import save_model_config
+        save_model_config(model_name)
+
+        # 加载新模型
+        return self.load_model(callback=callback)
+
     def _calculate_stability_score(self, probs_dict):
         """
-        计算情绪稳定度分数（内部方法）
+        计算情绪稳定度分数（多因子综合评分）
 
-        计算逻辑：
-        1. 对每种情绪，将其概率乘以对应的权重
-        2. 将所有情绪的加权得分相加
-        3. 乘以 10 得到 0-10 分制的分数
-        4. 限制在 0-10 范围内
+        计算逻辑综合三个因子：
+        1. 负面情绪加权分数（权重 40%）：各情绪概率×影响权重
+        2. 情绪分散度/熵（权重 30%）：概率分布的 Shannon 熵，高熵=不稳定
+        3. 情绪极端度（权重 30%）：负面情绪是否极端高概率
 
         参数：
             probs_dict (dict): 各情绪的概率字典，键为情绪名称，值为概率（0-1）
@@ -418,31 +562,79 @@ class EmotionRecognizer:
         返回值：
             float: 情绪稳定度分数（0-10，越高越不稳定），保留两位小数
         """
+        import math
         if not isinstance(probs_dict, dict):
             return 5.0
-        score = 0.0
+
+        # --- 因子 1: 负面情绪加权分数 (0-10) ---
+        negative_score = 0.0
         for emotion, prob in probs_dict.items():
             try:
                 prob_f = float(prob)
                 weight = float(EMOTION_WEIGHTS.get(emotion, 0.0))
                 if 0 <= prob_f <= 1:
-                    # 加权计算：概率 × 权重 × 10（转为10分制）
-                    score += prob_f * weight * 10
+                    negative_score += prob_f * weight * 10
             except (TypeError, ValueError):
                 continue
-        # 限制在 0-10 范围内
-        return round(min(10.0, max(0.0, score)), 2)
+        negative_score = min(10.0, max(0.0, negative_score))
+
+        # --- 因子 2: 情绪分散度/熵 (0-10) ---
+        # Shannon 熵计算，归一化到 0-10
+        entropy = 0.0
+        probs_list = []
+        for prob in probs_dict.values():
+            try:
+                p = float(prob)
+                if p > 0.001:  # 忽略极小概率
+                    probs_list.append(p)
+                    entropy -= p * math.log2(p)
+            except (TypeError, ValueError):
+                continue
+        # 最大熵为 log2(N)，归一化
+        max_entropy = math.log2(len(probs_dict)) if len(probs_dict) > 1 else 1.0
+        entropy_normalized = (entropy / max_entropy) * 10.0 if max_entropy > 0 else 0.0
+        entropy_normalized = min(10.0, max(0.0, entropy_normalized))
+
+        # --- 因子 3: 情绪极端度 (0-10) ---
+        # 检测是否存在极端高概率的负面情绪
+        extremity_score = 0.0
+        positive_total = 0.0
+        for emotion, prob in probs_dict.items():
+            try:
+                prob_f = float(prob)
+                if emotion in NEGATIVE_EMOTIONS:
+                    if prob_f > 0.60:  # 单一负面情绪 > 60%
+                        extremity_score = max(extremity_score, prob_f * 10)
+                    elif prob_f > 0.40:  # 中等程度
+                        extremity_score = max(extremity_score, prob_f * 7)
+                if emotion in POSITIVE_EMOTIONS:
+                    positive_total += prob_f
+            except (TypeError, ValueError):
+                continue
+        # 正面情绪占主导时降低不稳定度
+        if positive_total > 0.5:
+            extremity_score *= (1.0 - positive_total * 0.6)
+        extremity_score = min(10.0, max(0.0, extremity_score))
+
+        # --- 综合计算 ---
+        w = STABILITY_FACTOR_WEIGHTS
+        final_score = (
+            negative_score * w["negative_weight"] +
+            entropy_normalized * w["entropy"] +
+            extremity_score * w["extremity"]
+        )
+        return round(min(10.0, max(0.0, final_score)), 2)
 
     def _get_stability_level(self, score):
         """
         根据稳定度分数获取情绪状态等级和颜色（内部方法）
 
         等级划分：
-        - 0.0 - 1.5: 非常稳定（绿色）
-        - 1.5 - 3.0: 良好（浅绿）
-        - 3.0 - 4.5: 一般（黄色）
-        - 4.5 - 6.0: 轻度波动（橙色）
-        - 6.0 - 8.0: 不稳定（红色）
+        - 0.0 - 2.0: 非常稳定（绿色）
+        - 2.0 - 3.5: 良好（浅绿）
+        - 3.5 - 5.0: 一般（黄色）
+        - 5.0 - 6.5: 轻度波动（橙色）
+        - 6.5 - 8.0: 不稳定（红色）
         - 8.0 - 10.0: 情绪激烈（深红）
 
         参数：
@@ -455,13 +647,13 @@ class EmotionRecognizer:
             score_f = float(score)
         except (TypeError, ValueError):
             return "未知", "#95A5A6"
-        if score_f < 1.5:
+        if score_f < 2.0:
             return "非常稳定", STABILITY_LEVELS["非常稳定"]
-        elif score_f < 3.0:
+        elif score_f < 3.5:
             return "良好", STABILITY_LEVELS["良好"]
-        elif score_f < 4.5:
+        elif score_f < 5.0:
             return "一般", STABILITY_LEVELS["一般"]
-        elif score_f < 6.0:
+        elif score_f < 6.5:
             return "轻度波动", STABILITY_LEVELS["轻度波动"]
         elif score_f < 8.0:
             return "不稳定", STABILITY_LEVELS["不稳定"]
@@ -477,9 +669,9 @@ class EmotionRecognizer:
 
         建议分级策略：
         - 稳定度 < 2：非常好，给予正面反馈
-        - 稳定度 2-4：轻微波动，温和建议
-        - 稳定度 4-6：中度波动，较具体建议
-        - 稳定度 >= 6：高度不稳定，紧急建议 + 寻求帮助提示
+        - 稳定度 2-3.5：轻微波动，温和建议
+        - 稳定度 3.5-6.5：中度波动，较具体建议
+        - 稳定度 >= 6.5：高度不稳定，紧急建议 + 寻求帮助提示
 
         参数：
             main_emotion (str): 主要情绪类型
@@ -493,15 +685,17 @@ class EmotionRecognizer:
             if main_emotion == "开心":
                 return "😊 您当前情绪状态非常好，继续保持这份好心情！"
             return "😊 您当前情绪状态稳定，心态平和，继续保持！"
-        elif stability_score < 4:
+        elif stability_score < 3.5:
             if main_emotion == "悲伤":
                 return "💙 检测到些许低落情绪，可以试着做些让自己开心的事，听听音乐或和朋友聊聊天。"
             if main_emotion == "愤怒":
                 return "❤️‍🔥 感觉到一些烦躁情绪，建议深呼吸放松一下，或者稍作休息。"
             if main_emotion == "惊讶":
                 return "✨ 情绪有小幅波动，可能遇到了意想不到的事，深呼吸调整一下。"
+            if main_emotion == "厌恶":
+                return "🧡 感觉到轻微的不适，试着远离让您不舒服的环境，给自己一些空间。"
             return "🙂 情绪有轻微波动，属于正常范围，注意休息即可。"
-        elif stability_score < 6:
+        elif stability_score < 6.5:
             if main_emotion == "恐惧":
                 return "💜 检测到紧张/焦虑情绪，建议找个安静的地方放松，必要时可以和信任的人倾诉。"
             if main_emotion == "悲伤":
@@ -510,6 +704,8 @@ class EmotionRecognizer:
                 return "🧡 感觉到一些抵触情绪，试着远离让您不适的事物，给自己一些空间。"
             if main_emotion == "愤怒":
                 return "❤️‍🔥 情绪有些激动，建议先暂停当前事务，深呼吸10次，等平静后再处理问题。"
+            if main_emotion == "惊讶":
+                return "✨ 情绪波动较明显，可能受到了较大刺激，建议做些让自己平静的事情。"
             return "😐 情绪存在一定波动，建议适当休息，做一些放松活动。"
         else:
             if main_emotion == "恐惧":
@@ -518,7 +714,108 @@ class EmotionRecognizer:
                 return "⚠️ 检测到较强的负面情绪，请不要独自承受，建议联系亲友倾诉，必要时寻求专业帮助。"
             if main_emotion == "愤怒":
                 return "⚠️ 情绪较为激动，强烈建议先离开当前环境，进行深呼吸或冥想放松，避免在情绪激动时做决定。"
+            if main_emotion == "厌恶":
+                return "⚠️ 感觉到强烈的抵触情绪，建议立即更换环境，做些让自己舒适的事情，必要时和信任的人倒诉。"
             return "⚠️ 情绪波动较大，建议立即停下当前事务，进行深呼吸放松，必要时寻求他人陪伴。"
+
+    def _analyze_compound_emotions(self, probs_dict, main_emotion):
+        """
+        分析复合情绪模式（内部方法）
+
+        根据当前情绪概率分布，识别是否存在复合情绪模式。
+        复合情绪要求所有组成情绪的概率都超过一定阈值。
+
+        心理学依据：
+        - 复合情绪由多种基础情绪组合而成（如焦虑=恐惧+悲伤）
+        - 各组成情绪需同时达到一定强度才能判定为复合情绪
+        - "其他"情绪不参与复合情绪判断（非基础情绪类别）
+
+        参数：
+            probs_dict (dict): 各情绪的概率字典（包含所有8种情绪）
+            main_emotion (str): 主要情绪类型
+
+        返回值：
+            dict 或 None: 复合情绪信息字典，包含：
+                - name (str): 复合情绪名称
+                - desc (str): 复合情绪描述
+                - advice (str): 针对性建议
+                未检测到时返回 None
+        """
+        if not isinstance(probs_dict, dict):
+            return None
+
+        # 复合情绪检测阈值：组成情绪概率需超过此值
+        COMPOUND_THRESHOLD = 0.10
+
+        # 不参与复合情绪判断的情绪类别
+        EXCLUDED_EMOTIONS = {"其他"}
+
+        best_match = None
+        best_score = 0.0
+
+        for compound_name, compound_info in COMPOUND_EMOTIONS.items():
+            components = compound_info["components"]
+            # 检查所有组成情绪是否都超过阈值
+            all_present = True
+            component_score = 0.0
+            for comp_emotion in components:
+                # 跳过被排除的情绪类别
+                if comp_emotion in EXCLUDED_EMOTIONS:
+                    all_present = False
+                    break
+                prob = float(probs_dict.get(comp_emotion, 0.0))
+                if prob < COMPOUND_THRESHOLD:
+                    all_present = False
+                    break
+                component_score += prob
+
+            if all_present:
+                # 优先选择组成情绪总概率最高的复合情绪
+                if component_score > best_score:
+                    best_score = component_score
+                    best_match = compound_name
+
+        if best_match:
+            info = COMPOUND_EMOTIONS[best_match]
+            return {
+                "name": best_match,
+                "desc": info["desc"],
+                "advice": info["advice"]
+            }
+        return None
+
+    def _generate_emotion_summary(self, main_emotion, confidence, mixed_emotions,
+                                  compound_emotion, stability_score, stability_level):
+        """
+        生成情绪分析摘要文本（内部方法）
+
+        综合主要情绪、复合情绪、混合情绪和稳定度，
+        生成一段综合性的情绪状态描述。
+
+        参数：
+            main_emotion (str): 主要情绪
+            confidence (float): 主要情绪置信度
+            mixed_emotions (list): 混合情绪列表
+            compound_emotion (dict or None): 复合情绪信息
+            stability_score (float): 稳定度分数
+            stability_level (str): 稳定度等级
+
+        返回值：
+            str: 情绪分析摘要文本
+        """
+        parts = []
+        parts.append(f"主要情绪为「{main_emotion}」（置信度 {confidence:.0%}）")
+
+        if compound_emotion:
+            parts.append(f"检测到复合情绪「{compound_emotion['name']}」——{compound_emotion['desc']}")
+
+        if mixed_emotions:
+            mixed_str = "、".join([f"{e}({p*100:.0f}%)" for e, p in mixed_emotions[:3]])
+            parts.append(f"伴随情绪：{mixed_str}")
+
+        parts.append(f"情绪稳定度 {stability_score:.1f}/10（{stability_level}）")
+
+        return "；".join(parts)
 
     def predict(self, audio_path):
         """
@@ -684,6 +981,15 @@ class EmotionRecognizer:
                 if prob > 0.08 and emo != main_emotion:
                     mixed_emotions.append((emo, prob))
 
+            # 复合情绪分析
+            compound_emotion = self._analyze_compound_emotions(probs_dict, main_emotion)
+
+            # 生成情绪分析摘要
+            emotion_summary = self._generate_emotion_summary(
+                main_emotion, confidence, mixed_emotions,
+                compound_emotion, stability_score, stability_level
+            )
+
             return {
                 "success": True,
                 "主要情绪": main_emotion,
@@ -693,7 +999,10 @@ class EmotionRecognizer:
                 "情绪状态等级": stability_level,
                 "等级颜色": level_color,
                 "调节建议": advice,
-                "混合情绪": mixed_emotions
+                "混合情绪": mixed_emotions,
+                "复合情绪": compound_emotion.get("name", "") if compound_emotion else "",
+                "复合情绪详情": compound_emotion if compound_emotion else None,
+                "情绪分析摘要": emotion_summary
             }
 
         except torch.cuda.OutOfMemoryError:

@@ -4,23 +4,34 @@
 
 本模块是整个应用程序的启动入口，负责完成以下工作：
 1. 设置环境变量，禁用第三方库的自动安装和并行警告
-2. 初始化模型缓存路径（便携模式）
-3. 配置 PyQt5 应用的高 DPI 支持和字体
-4. 创建并显示主窗口，启动事件循环
+2. 初始化模型缓存路径（便携模式，所有数据存在程序目录）
+3. 配置 PyQt5 应用的高 DPI 支持和全局字体
+4. 创建并显示主窗口，启动 Qt 事件循环
+
+启动流程（顺序关键）：
+    1. 环境变量预配置（必须在 import modelscope/funasr 之前）
+    2. ModelScope/HuggingFace/PyTorch 缓存路径重定向
+    3. PyQt5 高 DPI 属性设置（必须在 QApplication 创建前）
+    4. QApplication 实例创建 + 全局字体配置
+    5. 主窗口创建与显示
+    6. Qt 事件循环启动
 
 运行方式：
     python main.py
 
 作者：Jiawei Li
-许可证：MIT License
+许可证：GPL v3
 """
 
 import sys
 import os
 
-# ---------------------------------------------------------------------------
+# ===========================================================================
 # 环境变量预配置（必须在导入相关库之前设置）
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# 这些环境变量控制 FunASR/ModelScope 的行为，防止运行时自动下载依赖
+# 必须在 `from funasr import ...` 或 `from modelscope import ...` 之前设置
+# ===========================================================================
 # 禁用 FunASR 的自动安装功能，避免运行时尝试下载依赖
 os.environ['FUNASR_AUTO_INSTALL'] = '0'
 os.environ['FUNASR_INSTALL_DEP'] = '0'
@@ -30,7 +41,8 @@ os.environ['MODELSCOPE_AUTO_INSTALL_DEP'] = '0'
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
 # 导入路径管理模块并设置模型缓存目录（便携模式）
-# 必须在导入 modelscope/funasr 之前完成设置
+# setup_modelscope_cache() 将 ModelScope/HuggingFace/PyTorch 缓存重定向到 portable_data/models/
+# 必须在导入 modelscope/funasr 之前完成，否则环境变量不会生效
 from app_paths import setup_modelscope_cache, get_log_file
 setup_modelscope_cache()
 

@@ -12,11 +12,11 @@
 4. 欢迎向导对话框（WelcomeDialog）：首次运行引导
 5. 数据管理对话框（DataManagerDialog）：数据清理、存储空间管理
 6. 后台工作线程：录音线程、分析线程、模型加载线程
-7. 自定义控件：分数卡片（ScoreCard）、趋势图（MplCanvas）
+7. 自定义控件：分数卡片（ScoreCard）、趋势图（MplCanvas）、Toast通知
 
 界面设计特点：
 - 采用卡片式布局，现代化渐变设计
-- 左右分栏设计，左侧为主操作区，右侧为日志和指南
+- 左右分栏设计，左侧为主操作区，右侧为快速指南
 - 支持高 DPI 适配，中文界面清晰
 - 全中文界面，用户友好
 
@@ -36,10 +36,11 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTabWidget, QGroupBox, QPushButton, QLabel, QProgressBar, QTextEdit,
     QListWidget, QSplitter, QFrame, QSizePolicy, QMessageBox, QFileDialog,
-    QMenuBar, QMenu, QAction, QGridLayout, QScrollArea, QDialog
+    QMenuBar, QMenu, QAction, QGridLayout, QScrollArea, QDialog, QComboBox,
+    QRadioButton, QButtonGroup, QGraphicsDropShadowEffect
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize, QObject, QUrl
-from PyQt5.QtGui import QFont, QPalette, QColor, QDesktopServices
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize, QObject, QUrl, QPropertyAnimation, QEasingCurve, QRect
+from PyQt5.QtGui import QFont, QPalette, QColor, QDesktopServices, QPainter, QBrush, QPen, QPainterPath
 
 from recorder import AudioRecorder
 from emotion_recognizer import EmotionRecognizer
@@ -47,7 +48,8 @@ from history_manager import HistoryManager
 from app_paths import (
     get_recordings_dir, get_log_file, get_temp_dir,
     get_cache_dir, get_user_data_dir, get_model_cache_dir,
-    get_app_dir, get_storage_stats, safe_remove_file, is_safe_path
+    get_app_dir, get_storage_stats, safe_remove_file, is_safe_path,
+    load_model_config, save_model_config, is_model_downloaded
 )
 
 logging.basicConfig(
@@ -222,7 +224,9 @@ class MplCanvas(FigureCanvas):
     - 绘制情绪稳定度变化趋势图
     - 自动配置中文字体（微软雅黑/黑体）
     - 支持分区域着色（不同稳定度等级不同颜色）
-    - 自动根据记录数调整 x 轴刻度
+    - 使用日期时间作为 x 轴标签
+    - 数据点标签仅在数据点 <= 20 个时显示
+    - 图例位于图表下方，不占用绘图区域
 
     参数：
         parent: 父窗口部件
@@ -230,7 +234,7 @@ class MplCanvas(FigureCanvas):
         height: 图表高度（英寸）
         dpi: 图表分辨率
     """
-    def __init__(self, parent=None, width=5, height=4, dpi=100):
+    def __init__(self, parent=None, width=10, height=6, dpi=100):
         if MATPLOTLIB_AVAILABLE:
             self.fig = Figure(figsize=(width, height), dpi=dpi)
             self.axes = self.fig.add_subplot(111)
@@ -249,34 +253,58 @@ class MplCanvas(FigureCanvas):
         except Exception as e:
             logger.warning(f"设置中文字体失败: {str(e)}")
 
+    def _draw_background_zones(self):
+        """绘制稳定度背景色带 - 构成主义单色梯度"""
+        self.axes.axhspan(0, 2, alpha=0.06, color='#2B2B2B', zorder=0)
+        self.axes.axhspan(2, 4, alpha=0.04, color='#2B2B2B', zorder=0)
+        self.axes.axhspan(4, 6, alpha=0.06, color='#8A8580', zorder=0)
+        self.axes.axhspan(6, 8, alpha=0.08, color='#C44B4F', zorder=0)
+        self.axes.axhspan(8, 10, alpha=0.12, color='#C44B4F', zorder=0)
+
+    def _draw_legend(self):
+        """绘制图例 - 构成主义简洁风格"""
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor='#2B2B2B', alpha=0.3, label='稳定 (0-4)'),
+            Patch(facecolor='#8A8580', alpha=0.4, label='波动 (4-6)'),
+            Patch(facecolor='#C44B4F', alpha=0.5, label='不稳定 (6-10)'),
+        ]
+        self.fig.legend(
+            handles=legend_elements,
+            loc='upper right',
+            bbox_to_anchor=(0.98, 0.98),
+            ncol=3,
+            fontsize=8,
+            frameon=True,
+            framealpha=0.9,
+            edgecolor='#2B2B2B',
+            borderpad=0.4,
+            columnspacing=1.0,
+            handlelength=1.2,
+            handletextpad=0.4
+        )
+
     def plot_data(self, records):
         if not MATPLOTLIB_AVAILABLE:
             return
 
         try:
             self.axes.clear()
+            # 清除旧的fig级别图例
+            for leg in self.fig.legends:
+                leg.remove()
 
             if not records:
-                self.axes.set_title("情绪稳定度变化趋势", fontsize=12, fontweight='bold', pad=15)
-                self.axes.set_xlabel("记录序号", fontsize=10, labelpad=10)
-                self.axes.set_ylabel("情绪稳定度", fontsize=10, labelpad=10)
+                self.fig.set_facecolor('#F2EDE4')
+                self.axes.set_facecolor('#F2EDE4')
+                self.axes.set_title("情绪稳定度变化趋势", fontsize=13, fontweight='bold', pad=12, loc='left')
+                self.axes.set_ylabel("情绪稳定度 (0-10)", fontsize=10, fontweight='bold', labelpad=10)
                 self.axes.set_ylim(0, 10)
-                self.axes.grid(True, alpha=0.3, linestyle='--')
-                self.axes.axhspan(0, 2, alpha=0.15, color='#27ae60')
-                self.axes.axhspan(2, 4, alpha=0.15, color='#2ecc71')
-                self.axes.axhspan(4, 6, alpha=0.15, color='#f1c40f')
-                self.axes.axhspan(6, 8, alpha=0.15, color='#e74c3c')
-                self.axes.axhspan(8, 10, alpha=0.15, color='#8b0000')
-                from matplotlib.patches import Patch
-                legend_elements = [
-                    Patch(facecolor='#27ae60', alpha=0.5, label='非常稳定'),
-                    Patch(facecolor='#2ecc71', alpha=0.5, label='稳定'),
-                    Patch(facecolor='#f1c40f', alpha=0.5, label='轻微波动'),
-                    Patch(facecolor='#e74c3c', alpha=0.5, label='不稳定'),
-                    Patch(facecolor='#8b0000', alpha=0.5, label='情绪激烈')
-                ]
-                self.axes.legend(handles=legend_elements, loc='upper right', fontsize=8)
-                self.fig.tight_layout()
+                self.axes.grid(True, alpha=0.3, linestyle='--', zorder=1)
+                self._draw_background_zones()
+                self._draw_legend()
+                self.fig.tight_layout(pad=2.0)
+                self.fig.subplots_adjust(bottom=0.15, top=0.88)
                 self.draw()
                 return
 
@@ -284,56 +312,324 @@ class MplCanvas(FigureCanvas):
             n = len(records_chronological)
             x = list(range(1, n + 1))
             y = []
+            timestamps = []
             for r in records_chronological:
                 try:
                     score = r.get('情绪稳定度分数', r.get('anxiety_score', 0.0))
                     y.append(float(score))
                 except (TypeError, ValueError):
                     y.append(0.0)
+                timestamps.append(str(r.get('timestamp', '')))
 
-            self.axes.axhspan(0, 2, alpha=0.15, color='#27ae60')
-            self.axes.axhspan(2, 4, alpha=0.15, color='#2ecc71')
-            self.axes.axhspan(4, 6, alpha=0.15, color='#f1c40f')
-            self.axes.axhspan(6, 8, alpha=0.15, color='#e74c3c')
-            self.axes.axhspan(8, 10, alpha=0.15, color='#8b0000')
+            self.fig.set_facecolor('#F2EDE4')
+            self.axes.set_facecolor('#F2EDE4')
 
-            self.axes.plot(x, y, color='#667eea', linewidth=2.5, marker='o',
-                           markersize=7, markerfacecolor='#764ba2', markeredgecolor='white',
-                           markeredgewidth=2)
+            # 背景色带
+            self._draw_background_zones()
 
-            for i, (xi, yi) in enumerate(zip(x, y)):
-                self.axes.annotate(f'{yi:.1f}', (xi, yi), textcoords="offset points",
-                                  xytext=(0, 10), ha='center', fontsize=9, fontweight='bold')
+            # 绘制趋势线 - 构成主义工业风格：砖红线条+方块数据点
+            self.axes.plot(x, y, color='#C44B4F', linewidth=2, marker='s',
+                           markersize=5, markerfacecolor='#C44B4F',
+                           markeredgecolor='#2B2B2B', markeredgewidth=1,
+                           zorder=5)
 
-            self.axes.set_title("情绪稳定度变化趋势", fontsize=13, fontweight='bold', pad=15)
-            self.axes.set_xlabel("记录序号（按时间先后）", fontsize=10, labelpad=10)
-            self.axes.set_ylabel("情绪稳定度 (0-10)", fontsize=10, labelpad=10)
-            self.axes.set_ylim(0, 10.5)
+            # 数据点标签（仅 <= 20 个时显示）
+            if n <= 20:
+                for xi, yi in zip(x, y):
+                    self.axes.annotate(f'{yi:.1f}', (xi, yi), textcoords="offset points",
+                                      xytext=(0, 10), ha='center', fontsize=8,
+                                      fontweight='bold', color='#2B2B2B', zorder=6)
+
+            # x 轴标签：使用日期时间
+            self.axes.set_title("情绪稳定度变化趋势", fontsize=13, fontweight='bold', pad=12, loc='left')
+            self.axes.set_ylabel("情绪稳定度 (0-10)", fontsize=10, fontweight='bold', labelpad=10)
+            self.axes.set_ylim(-0.3, 10.3)
             self.axes.set_xlim(0.5, n + 0.5)
-            self.axes.set_xticks(x)
-            if n > 20:
-                self.axes.set_xticks(x[::max(1, n // 10)])
-            self.axes.grid(True, alpha=0.3, linestyle='--')
+            self.axes.grid(True, alpha=0.3, linestyle='--', zorder=1)
 
-            from matplotlib.patches import Patch
-            legend_elements = [
-                Patch(facecolor='#27ae60', alpha=0.5, label='非常稳定 (0-2)'),
-                Patch(facecolor='#2ecc71', alpha=0.5, label='稳定 (2-4)'),
-                Patch(facecolor='#f1c40f', alpha=0.5, label='轻微波动 (4-6)'),
-                Patch(facecolor='#e74c3c', alpha=0.5, label='不稳定 (6-8)'),
-                Patch(facecolor='#8b0000', alpha=0.5, label='情绪激烈 (8-10)')
-            ]
-            self.axes.legend(handles=legend_elements, loc='upper right', fontsize=8)
+            # 设置 x 轴刻度
+            if n <= 15:
+                # 少量数据：显示所有日期时间标签
+                self.axes.set_xticks(x)
+                date_labels = []
+                for ts in timestamps:
+                    try:
+                        dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+                        date_labels.append(dt.strftime("%m-%d %H:%M"))
+                    except (ValueError, TypeError):
+                        date_labels.append(ts[-8:] if ts else "")
+                self.axes.set_xticklabels(date_labels, rotation=45, ha='right', fontsize=8)
+            elif n <= 40:
+                # 中等数据：每隔几个显示一个
+                step = max(1, n // 10)
+                tick_positions = x[::step]
+                tick_labels = []
+                for i in range(0, n, step):
+                    try:
+                        dt = datetime.strptime(timestamps[i], "%Y-%m-%d %H:%M:%S")
+                        tick_labels.append(dt.strftime("%m-%d %H:%M"))
+                    except (ValueError, TypeError):
+                        tick_labels.append("")
+                self.axes.set_xticks(tick_positions)
+                self.axes.set_xticklabels(tick_labels, rotation=45, ha='right', fontsize=8)
+            else:
+                # 大量数据：只显示首尾和中间几个
+                tick_positions = [x[0], x[n//4], x[n//2], x[3*n//4], x[-1]]
+                tick_labels = []
+                for idx in [0, n//4, n//2, 3*n//4, n-1]:
+                    try:
+                        dt = datetime.strptime(timestamps[idx], "%Y-%m-%d %H:%M:%S")
+                        tick_labels.append(dt.strftime("%m-%d %H:%M"))
+                    except (ValueError, TypeError):
+                        tick_labels.append("")
+                self.axes.set_xticks(tick_positions)
+                self.axes.set_xticklabels(tick_labels, rotation=45, ha='right', fontsize=8)
 
-            self.fig.tight_layout()
+            self.axes.set_xlabel("", fontsize=10, labelpad=10)
+
+            # 图例
+            self._draw_legend()
+
+            # 布局调整
+            self.fig.tight_layout(pad=2.5)
+            self.fig.subplots_adjust(bottom=0.20, left=0.08, right=0.95, top=0.88)
             self.draw()
         except Exception as e:
             logger.error(f"绘图失败: {str(e)}", exc_info=True)
 
 
+
+class ToastNotification(QFrame):
+    """
+    苹果风格弹窗通知组件
+
+    用于在界面右上角展示错误/警告信息，支持自动消失和手动关闭。
+    """
+
+    def __init__(self, parent, message, level="warning", duration=5000):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.SubWindow)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setFixedWidth(380)
+        self._opacity = 1.0
+
+        # 图标和颜色 - 构成主义风格
+        if level == "error":
+            icon = "■"  # 几何方块
+            bg_color = "#F2EDE4"
+            border_color = "#C44B4F"
+            title_color = "#C44B4F"
+            title_text = "错误"
+        else:
+            icon = "▲"  # 几何三角
+            bg_color = "#F2EDE4"
+            border_color = "#8A8580"
+            title_color = "#2B2B2B"
+            title_text = "警告"
+
+        # 布局
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(16, 12, 12, 12)
+        main_layout.setSpacing(10)
+
+        # 图标
+        icon_label = QLabel(icon)
+        icon_label.setFont(QFont("Segoe UI Emoji", 16))
+        icon_label.setFixedSize(32, 32)
+        icon_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(icon_label)
+
+        # 内容区
+        content_layout = QVBoxLayout()
+        content_layout.setSpacing(2)
+
+        title_label = QLabel(title_text)
+        title_label.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
+        title_label.setStyleSheet(f"color: {title_color}; background: transparent;")
+        content_layout.addWidget(title_label)
+
+        msg_label = QLabel(message)
+        msg_label.setFont(QFont("Microsoft YaHei", 9))
+        msg_label.setWordWrap(True)
+        msg_label.setStyleSheet("color: #2B2B2B; background: transparent;")
+        msg_label.setMaximumWidth(280)
+        content_layout.addWidget(msg_label)
+
+        main_layout.addLayout(content_layout, 1)
+
+        # 关闭按钮
+        close_btn = QPushButton("×")
+        close_btn.setFixedSize(24, 24)
+        close_btn.setFont(QFont("Arial", 14))
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: none;
+                color: #2B2B2B;
+                border-radius: 0px;
+            }
+            QPushButton:hover {
+                background: rgba(43,43,43,0.1);
+                color: #C44B4F;
+            }
+        """)
+        close_btn.clicked.connect(self.fade_out)
+        main_layout.addWidget(close_btn, 0, Qt.AlignTop)
+
+        self.setStyleSheet(f"""
+            ToastNotification {{
+                background-color: {bg_color};
+                border: 3px solid {border_color};
+                border-radius: 0px;
+            }}
+        """)
+
+        # 硬阴影效果 - 构成主义风格
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(0)
+        shadow.setColor(QColor(43, 43, 43, 60))
+        shadow.setOffset(3, 3)
+        self.setGraphicsEffect(shadow)
+
+        self.adjustSize()
+
+        # 自动消失定时器
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self.fade_out)
+        self._timer.start(duration)
+
+    def fade_out(self):
+        """ 淡出动画后关闭 """
+        self._timer.stop()
+        # 用一个简单的定时器动画模拟淡出
+        self._fade_timer = QTimer(self)
+        self._fade_step = 0
+        self._fade_timer.timeout.connect(self._do_fade)
+        self._fade_timer.start(30)
+
+    def _do_fade(self):
+        self._fade_step += 1
+        self._opacity = max(0, 1.0 - self._fade_step * 0.1)
+        self.setWindowOpacity(self._opacity) if hasattr(self, 'setWindowOpacity') else None
+        self.update()
+        if self._fade_step >= 10:
+            self._fade_timer.stop()
+            self.close()
+            self.deleteLater()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setOpacity(self._opacity)
+        path = QPainterPath()
+        path.addRect(0, 0, self.width(), self.height())
+        painter.fillPath(path, QBrush(self.palette().window().color()))
+        super().paintEvent(event)
+
+
+class ToastManager:
+    """
+    Toast通知管理器
+
+    管理多个Toast的显示位置，避免重叠。
+    """
+    def __init__(self, parent):
+        self.parent = parent
+        self.toasts = []
+
+    def show_toast(self, message, level="warning", duration=5000):
+        """ 显示一个Toast通知 """
+        # 清理已关闭的toast
+        self.toasts = [t for t in self.toasts if t.isVisible()]
+
+        toast = ToastNotification(self.parent, message, level, duration)
+        self.toasts.append(toast)
+
+        # 计算位置（右上角堆叠）
+        self._reposition()
+        toast.show()
+
+    def _reposition(self):
+        """ 重新计算所有toast位置 """
+        margin_top = 20
+        margin_right = 20
+        spacing = 10
+        y_offset = margin_top
+
+        parent_rect = self.parent.rect()
+        for toast in self.toasts:
+            if toast.isVisible():
+                x = parent_rect.width() - toast.width() - margin_right
+                toast.move(x, y_offset)
+                y_offset += toast.height() + spacing
+
+
+class ConstructivistBackground(QWidget):
+    """构成主义几何背景层 - 苏联构成主义风格"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self._cache = None
+
+    def paintEvent(self, event):
+        if self._cache and self._cache.size() == self.size():
+            painter = QPainter(self)
+            painter.drawPixmap(0, 0, self._cache)
+            return
+
+        from PyQt5.QtGui import QLinearGradient, QPixmap, QPolygon
+        from PyQt5.QtCore import QPoint
+        pixmap = QPixmap(self.size())
+        p = QPainter(pixmap)
+        p.setRenderHint(QPainter.Antialiasing)
+
+        # 渐变背景：暖白到暖灰
+        gradient = QLinearGradient(0, 0, 0, self.height())
+        gradient.setColorAt(0, QColor("#F2EDE4"))
+        gradient.setColorAt(1, QColor("#E8E3DA"))
+        p.fillRect(self.rect(), gradient)
+
+        # 45度斜线纹理（极淡，工业感）
+        pen = QPen(QColor(43, 43, 43, 12))  # #2B2B2B 透明度约5%
+        pen.setWidth(1)
+        p.setPen(pen)
+        spacing = 60
+        for i in range(-self.height(), self.width() + self.height(), spacing):
+            p.drawLine(i, 0, i + self.height(), self.height())
+
+        # 左上角砖红色45度三角形
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor("#C44B4F"))
+        triangle_tl = QPolygon([QPoint(0, 0), QPoint(45, 0), QPoint(0, 45)])
+        p.drawPolygon(triangle_tl)
+
+        # 右下角炭黑色45度三角形
+        p.setBrush(QColor("#2B2B2B"))
+        w, h = self.width(), self.height()
+        triangle_br = QPolygon([QPoint(w, h), QPoint(w - 38, h), QPoint(w, h - 38)])
+        p.drawPolygon(triangle_br)
+
+        # 左下角细小砖红装饰线（45度）
+        pen2 = QPen(QColor("#C44B4F"))
+        pen2.setWidth(2)
+        p.setPen(pen2)
+        p.drawLine(0, h - 20, 20, h)
+
+        p.end()
+        self._cache = pixmap
+        painter = QPainter(self)
+        painter.drawPixmap(0, 0, self._cache)
+
+    def resizeEvent(self, event):
+        self._cache = None
+        super().resizeEvent(event)
+
+
 class ScoreCard(QFrame):
     """
-    分数卡片控件类
+    分数卡片控件类 - 苏联构成主义风格
 
     自定义的分数展示卡片控件，用于在结果区域显示：
     - 情绪稳定度分数
@@ -341,20 +637,22 @@ class ScoreCard(QFrame):
     - 主要情绪
 
     设计特点：
-    - 圆角卡片样式，现代化设计
-    - 大字号数字展示，醒目清晰
+    - 构成主义风格：粗炭黑边框、直角、三角装饰
+    - 等宽粗体数字展示为视觉焦点
     - 支持自定义颜色和副标题
     - 支持重置为空状态
 
     参数：
         title (str): 卡片标题
         parent: 父窗口部件
+        accent_color (str): 装饰色（砖红）
     """
-    def __init__(self, title, parent=None):
+    def __init__(self, title, parent=None, accent_color="#C44B4F"):
         super().__init__(parent)
         self.setObjectName("scoreCard")
-        self.setMinimumHeight(160)
+        self.setMinimumHeight(180)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self._accent_color = accent_color
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(25, 22, 25, 22)
@@ -363,14 +661,14 @@ class ScoreCard(QFrame):
         self.title_label = QLabel(title)
         self.title_label.setObjectName("cardTitle")
         self.title_label.setAlignment(Qt.AlignCenter)
-        self.title_label.setFont(QFont("Microsoft YaHei", 11))
+        self.title_label.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
         self.title_label.setMinimumHeight(25)
         layout.addWidget(self.title_label)
 
         self.value_label = QLabel("--")
         self.value_label.setObjectName("cardValue")
         self.value_label.setAlignment(Qt.AlignCenter)
-        self.value_label.setFont(QFont("Microsoft YaHei", 36, QFont.Bold))
+        self.value_label.setFont(QFont("Consolas", 38, QFont.Bold))
         self.value_label.setMinimumHeight(60)
         self.value_label.setWordWrap(False)
         layout.addWidget(self.value_label, 1)
@@ -381,6 +679,24 @@ class ScoreCard(QFrame):
         self.sub_label.setFont(QFont("Microsoft YaHei", 11))
         self.sub_label.setMinimumHeight(25)
         layout.addWidget(self.sub_label)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, False)
+        # 炭黑粗边框
+        pen = QPen(QColor("#2B2B2B"))
+        pen.setWidth(3)
+        painter.setPen(pen)
+        painter.drawRect(2, 2, self.width()-4, self.height()-4)
+        # 左上角45度三角装饰（砖红）
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(self._accent_color))
+        from PyQt5.QtGui import QPolygon
+        from PyQt5.QtCore import QPoint
+        triangle = QPolygon([QPoint(0, 0), QPoint(20, 0), QPoint(0, 20)])
+        painter.drawPolygon(triangle)
+        painter.end()
+        super().paintEvent(event)
 
     def set_value(self, value, color=None, sub_text=""):
         self.value_label.setText(str(value))
@@ -418,6 +734,7 @@ class WelcomeDialog(QDialog):
     def __init__(self, parent=None, is_first_run=True):
         super().__init__(parent)
         self.is_first_run = is_first_run
+        self.selected_model = load_model_config()
         self.setWindowTitle("欢迎使用语音情绪识别系统")
         self.setMinimumSize(700, 600)
         self.setup_ui()
@@ -427,10 +744,10 @@ class WelcomeDialog(QDialog):
         layout.setSpacing(20)
         layout.setContentsMargins(30, 30, 30, 30)
 
-        title_label = QLabel("🎙️ 欢迎使用语音情绪识别系统")
-        title_label.setFont(QFont("Microsoft YaHei", 22, QFont.Bold))
+        title_label = QLabel("欢迎使用语音情绪识别系统")
+        title_label.setFont(QFont("Microsoft YaHei", 22, QFont.Black))
         title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("color: #667eea; margin-bottom: 10px;")
+        title_label.setStyleSheet("color: #2B2B2B; margin-bottom: 10px;")
         layout.addWidget(title_label)
 
         scroll = QScrollArea()
@@ -451,27 +768,66 @@ class WelcomeDialog(QDialog):
         content_layout.addWidget(intro_text)
 
         if self.is_first_run:
-            model_group = QGroupBox("📦 关于AI模型")
+            model_group = QGroupBox("选择AI模型")
             model_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
             model_layout = QVBoxLayout(model_group)
             model_layout.setContentsMargins(20, 25, 20, 20)
             model_text = QLabel(
                 "<div style='line-height: 1.7; font-size: 11pt;'>"
-                "<p><b>我们将使用开源的 emotion2vec_plus_large 模型</b></p>"
+                "<p><b>请选择要使用的 emotion2vec+ 模型：</b></p>"
                 "<p>• 来源：ModelScope 达摩院（阿里巴巴）</p>"
                 "<p>• 许可协议：Apache License 2.0（可免费使用）</p>"
-                "<p>• 模型大小：约 1GB</p>"
-                "<p style='color: #e67e22;'><b>⚠️ 重要提示：</b></p>"
+                "<p style='color: #C44B4F;'><b>重要提示：</b></p>"
                 "<p>首次使用需要下载模型，请确保网络连接正常。模型下载完成后，"
-                "以后启动程序就会很快啦！模型会保存在程序文件夹中，不会丢失。</p>"
+                "以后启动程序就会很快啦！模型会保存在程序文件夨中，不会丢失。</p>"
                 "</div>"
             )
             model_text.setWordWrap(True)
             model_text.setTextFormat(Qt.RichText)
             model_layout.addWidget(model_text)
+        
+            # 模型选择 ComboBox
+            model_select_label = QLabel("选择模型：")
+            model_select_label.setFont(QFont("Microsoft YaHei", 11))
+            model_layout.addWidget(model_select_label)
+        
+            self.model_combo = QComboBox()
+            self.model_combo.setFont(QFont("Microsoft YaHei", 11))
+            self.model_combo.setMinimumHeight(40)
+            self.model_combo.addItem("emotion2vec_plus_large — 大型模型 (~1GB) 精度最高【推荐】", "emotion2vec_plus_large")
+            self.model_combo.addItem("emotion2vec_plus_base — 基础模型 (~500MB) 速度与精度均衡", "emotion2vec_plus_base")
+            self.model_combo.addItem("emotion2vec_plus_seed — 最小模型 (~200MB) 速度最快", "emotion2vec_plus_seed")
+            self.model_combo.setStyleSheet("""
+                QComboBox {
+                    border: 2px solid #2B2B2B;
+                    border-radius: 0px;
+                    padding: 8px 15px;
+                    background-color: #F2EDE4;
+                    color: #2B2B2B;
+                    font-weight: bold;
+                }
+                QComboBox:hover {
+                    border-color: #C44B4F;
+                }
+                QComboBox:focus {
+                    border-color: #C44B4F;
+                    border-width: 3px;
+                }
+                QComboBox::drop-down {
+                    border: none;
+                    padding-right: 10px;
+                }
+            """)
+            # 设置默认选中项
+            current_model = load_model_config()
+            for i in range(self.model_combo.count()):
+                if self.model_combo.itemData(i) == current_model:
+                    self.model_combo.setCurrentIndex(i)
+                    break
+            model_layout.addWidget(self.model_combo)
             content_layout.addWidget(model_group)
 
-        tech_group = QGroupBox("🛠️ 技术栈")
+        tech_group = QGroupBox("技术栈")
         tech_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         tech_layout = QVBoxLayout(tech_group)
         tech_layout.setContentsMargins(20, 25, 20, 20)
@@ -489,18 +845,18 @@ class WelcomeDialog(QDialog):
         tech_layout.addWidget(tech_text)
         content_layout.addWidget(tech_group)
 
-        usage_group = QGroupBox("📖 使用方法（超简单！）")
+        usage_group = QGroupBox("使用方法")
         usage_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         usage_layout = QVBoxLayout(usage_group)
         usage_layout.setContentsMargins(20, 25, 20, 20)
         usage_text = QLabel(
             "<div style='line-height: 2.0; font-size: 12pt;'>"
-            "1️⃣ 等待模型加载完成（首次需下载，会显示进度）<br>"
-            "2️⃣ 点击绿色的「开始录音」按钮<br>"
-            "3️⃣ 自然地说出您现在的感受（建议 3-30 秒）<br>"
-            "4️⃣ 点击红色的「停止录音」按钮<br>"
-            "5️⃣ 稍等几秒，就能看到分析结果啦！<br><br>"
-            "<b>💡 小贴士：</b>在安静的环境下录音，效果会更好哦～"
+            "1. 等待模型加载完成（首次需下载，会显示进度）<br>"
+            "2. 点击「开始录音」按钮<br>"
+            "3. 自然地说出您现在的感受（建议 3-30 秒）<br>"
+            "4. 点击「停止录音」按钮<br>"
+            "5. 稍等几秒，即可查看分析结果<br><br>"
+            "<b>提示：</b>在安静的环境下录音，效果更佳。"
             "</div>"
         )
         usage_text.setWordWrap(True)
@@ -508,7 +864,7 @@ class WelcomeDialog(QDialog):
         usage_layout.addWidget(usage_text)
         content_layout.addWidget(usage_group)
 
-        tips_group = QGroupBox("📂 数据管理")
+        tips_group = QGroupBox("数据管理")
         tips_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         tips_layout = QVBoxLayout(tips_group)
         tips_layout.setContentsMargins(20, 25, 20, 20)
@@ -526,7 +882,7 @@ class WelcomeDialog(QDialog):
         tips_layout.addWidget(tips_text)
         content_layout.addWidget(tips_group)
 
-        disclaimer_group = QGroupBox("⚠️ 重要声明")
+        disclaimer_group = QGroupBox("重要声明")
         disclaimer_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         disclaimer_layout = QVBoxLayout(disclaimer_group)
         disclaimer_layout.setContentsMargins(20, 25, 20, 20)
@@ -550,25 +906,27 @@ class WelcomeDialog(QDialog):
         btn_layout.addStretch()
 
         if self.is_first_run:
-            start_btn = QPushButton("🚀 开始使用（下载模型）")
+            start_btn = QPushButton("开始使用（下载模型）")
             start_btn.setFont(QFont("Microsoft YaHei", 13, QFont.Bold))
             start_btn.setMinimumHeight(50)
             start_btn.setMinimumWidth(250)
             start_btn.setStyleSheet("""
                 QPushButton {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #667eea, stop:1 #764ba2);
+                    background-color: #C44B4F;
                     color: white;
-                    border: none;
-                    border-radius: 12px;
+                    border: 2px solid #2B2B2B;
+                    border-radius: 2px;
                     padding: 12px 30px;
+                    font-weight: bold;
                 }
                 QPushButton:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #764ba2, stop:1 #667eea);
+                    background-color: #A33B3F;
+                }
+                QPushButton:pressed {
+                    background-color: #8A2E31;
                 }
             """)
-            start_btn.clicked.connect(self.accept)
+            start_btn.clicked.connect(self._on_start_clicked)
             btn_layout.addWidget(start_btn)
         else:
             close_btn = QPushButton("知道了")
@@ -577,14 +935,16 @@ class WelcomeDialog(QDialog):
             close_btn.setMinimumWidth(150)
             close_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #667eea;
+                    background-color: #2B2B2B;
                     color: white;
-                    border: none;
-                    border-radius: 10px;
+                    border: 2px solid #2B2B2B;
+                    border-radius: 2px;
                     padding: 10px 30px;
+                    font-weight: bold;
                 }
                 QPushButton:hover {
-                    background-color: #764ba2;
+                    background-color: #C44B4F;
+                    border-color: #C44B4F;
                 }
             """)
             close_btn.clicked.connect(self.accept)
@@ -593,13 +953,158 @@ class WelcomeDialog(QDialog):
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
 
+    def _on_start_clicked(self):
+        """首次运行时点击“开始使用”按钮的处理"""
+        if hasattr(self, 'model_combo'):
+            self.selected_model = self.model_combo.currentData()
+            save_model_config(self.selected_model)
+        self.accept()
+
     @staticmethod
     def is_model_downloaded():
-        from app_paths import get_model_cache_dir
-        model_dir = get_model_cache_dir()
-        target_model_dir = os.path.join(model_dir, 'models', 'iic', 'emotion2vec_plus_large')
-        return os.path.exists(target_model_dir) and os.path.exists(
-            os.path.join(target_model_dir, 'model.pt'))
+        """ 检查当前配置的模型是否已下载 """
+        current_model = load_model_config()
+        return is_model_downloaded(current_model)
+
+
+class ModelSwitchDialog(QDialog):
+    """
+    模型切换对话框类
+
+    允许用户在运行时切换不同的 emotion2vec+ 模型。
+    显示每个模型的信息、下载状态和当前使用状态。
+    """
+    def __init__(self, current_model_name, parent=None):
+        super().__init__(parent)
+        self.current_model = current_model_name
+        self.selected_model = current_model_name
+        self.setWindowTitle("切换AI模型")
+        self.setMinimumSize(550, 420)
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(15)
+        layout.setContentsMargins(25, 25, 25, 25)
+
+        title_label = QLabel("选择情绪识别模型")
+        title_label.setFont(QFont("Microsoft YaHei", 16, QFont.Bold))
+        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setStyleSheet("color: #2B2B2B; margin-bottom: 5px;")
+        layout.addWidget(title_label)
+
+        desc_label = QLabel("选择不同的模型会影响识别精度和运行速度，切换后需要重新加载模型。")
+        desc_label.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
+        desc_label.setStyleSheet("color: #8A8580;")
+        desc_label.setWordWrap(True)
+        layout.addWidget(desc_label)
+
+        from emotion_recognizer import AVAILABLE_MODELS
+
+        self.btn_group = QButtonGroup(self)
+        models_info = [
+            ("emotion2vec_plus_large", "Large（大型模型）", "~1GB", "精度最高，推荐使用"),
+            ("emotion2vec_plus_base", "Base（基础模型）", "~500MB", "速度与精度均衡"),
+            ("emotion2vec_plus_seed", "Seed（最小模型）", "~200MB", "速度最快，适合低配置设备"),
+        ]
+
+        for model_name, display, size, desc in models_info:
+            downloaded = is_model_downloaded(model_name)
+            is_current = (model_name == self.current_model)
+
+            radio = QRadioButton()
+            radio.setProperty("model_name", model_name)
+            if is_current:
+                radio.setChecked(True)
+
+            # 构建卡片展示文本
+            status_text = "■ 当前使用" if is_current else ("■ 已下载" if downloaded else "△ 需要下载")
+            status_color = "#2B2B2B" if (is_current or downloaded) else "#C44B4F"
+            radio.setText(f"{display}  |  大小: {size}  |  {desc}")
+            radio.setFont(QFont("Microsoft YaHei", 11))
+            radio.setMinimumHeight(50)
+            radio.setStyleSheet(f"""
+                QRadioButton {{
+                    padding: 12px 15px;
+                    border: 2px solid {'#C44B4F' if is_current else '#2B2B2B'};
+                    border-radius: 0px;
+                    background-color: {'#F2EDE4' if is_current else '#FFFFFF'};
+                    font-weight: bold;
+                }}
+                QRadioButton:hover {{
+                    border-color: #C44B4F;
+                    background-color: #F2EDE4;
+                }}
+            """)
+
+            self.btn_group.addButton(radio)
+            layout.addWidget(radio)
+
+            # 状态标签
+            status_label = QLabel(f"    {status_text}")
+            status_label.setFont(QFont("Microsoft YaHei", 9))
+            status_label.setStyleSheet(f"color: {status_color}; margin-left: 30px; margin-top: -5px;")
+            layout.addWidget(status_label)
+
+        layout.addStretch()
+
+        # 按钮区域
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        cancel_btn = QPushButton("取消")
+        cancel_btn.setFont(QFont("Microsoft YaHei", 11))
+        cancel_btn.setMinimumHeight(40)
+        cancel_btn.setMinimumWidth(100)
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #E8E3DA;
+                color: #2B2B2B;
+                border: 2px solid #2B2B2B;
+                border-radius: 2px;
+                padding: 8px 20px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #8A8580;
+                color: white;
+            }
+        """)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        self.confirm_btn = QPushButton("确认切换")
+        self.confirm_btn.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
+        self.confirm_btn.setMinimumHeight(40)
+        self.confirm_btn.setMinimumWidth(140)
+        self.confirm_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #C44B4F;
+                color: white;
+                border: 2px solid #2B2B2B;
+                border-radius: 2px;
+                padding: 8px 20px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #A33B3F;
+            }
+        """)
+        self.confirm_btn.clicked.connect(self._on_confirm)
+        btn_layout.addWidget(self.confirm_btn)
+
+        layout.addLayout(btn_layout)
+
+    def _on_confirm(self):
+        """确认切换按钮处理"""
+        checked = self.btn_group.checkedButton()
+        if checked:
+            self.selected_model = checked.property("model_name")
+        self.accept()
+
+    def get_selected_model(self):
+        """获取用户选择的模型名"""
+        return self.selected_model
 
 
 class DataManagerDialog(QDialog):
@@ -641,54 +1146,34 @@ class DataManagerDialog(QDialog):
         layout.setSpacing(15)
         layout.setContentsMargins(5, 5, 5, 5)
 
-        info_group = QGroupBox("💾 数据存储位置（便携模式）")
+        info_group = QGroupBox("数据存储位置（便携模式）")
         info_group.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
         info_layout = QVBoxLayout(info_group)
 
-        app_dir = get_app_dir()
-        data_dir = get_user_data_dir()
-
-        def path_to_url(p):
-            return QUrl.fromLocalFile(os.path.abspath(p)).toString()
-
-        path_info = QLabel(
-            f"<div style='line-height: 1.8; font-size: 11pt;'>"
-            f"<p><b>程序目录：</b><br>"
-            f"<a href='{path_to_url(app_dir)}' style='color: #667eea;'>{app_dir}</a></p>"
-            f"<p><b>数据目录（所有用户数据保存在此）：</b><br>"
-            f"<a href='{path_to_url(data_dir)}' style='color: #667eea;'>{data_dir}</a></p>"
-            f"<p><b>数据结构说明：</b></p>"
-            f"<ul style='margin: 5px 0; padding-left: 20px; line-height: 2.0;'>"
-            f"<li>📁 <b>recordings/</b> —— 您的录音文件（可删除）</li>"
-            f"<li>📁 <b>models/</b> —— AI模型文件（<span style='color: #e74c3c; font-weight: bold;'>不可删除，删除后需重新下载约1GB</span>）</li>"
-            f"<li>📁 <b>logs/</b> —— 程序运行日志（可清除）</li>"
-            f"<li>📁 <b>temp/</b> —— 临时文件（可清除）</li>"
-            f"<li>📁 <b>cache/</b> —— 缓存文件（可清除）</li>"
-            f"<li>📄 <b>history.json</b> —— 历史记录（可删除）</li>"
-            f"</ul>"
-            f"</div>"
-        )
-        path_info.setTextFormat(Qt.RichText)
-        path_info.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        path_info.setOpenExternalLinks(True)
-        path_info.setWordWrap(True)
-        info_layout.addWidget(path_info)
+        self.path_info = QLabel("")
+        self.path_info.setTextFormat(Qt.RichText)
+        self.path_info.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        self.path_info.setOpenExternalLinks(True)
+        self.path_info.setWordWrap(True)
+        info_layout.addWidget(self.path_info)
 
         layout.addWidget(info_group)
+
+        self.refresh_path_info()
 
         self.stats_label = QLabel("")
         self.stats_label.setFont(QFont("Microsoft YaHei", 11))
         self.stats_label.setWordWrap(True)
-        self.stats_label.setStyleSheet("padding: 10px; background-color: #f8f9fa; border-radius: 8px;")
+        self.stats_label.setStyleSheet("padding: 12px; background-color: #F2EDE4; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
         layout.addWidget(self.stats_label)
 
-        actions_group = QGroupBox("🗑️ 数据清理操作")
+        actions_group = QGroupBox("数据清理操作")
         actions_group.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
         actions_layout = QVBoxLayout(actions_group)
         actions_layout.setSpacing(10)
         actions_layout.setContentsMargins(15, 25, 15, 15)
 
-        del_all_btn = QPushButton("🗑️ 清空所有历史记录和录音")
+        del_all_btn = QPushButton("清空所有历史记录和录音")
         del_all_btn.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
         del_all_btn.setMinimumHeight(45)
         del_all_btn.setObjectName("dangerBtn")
@@ -696,7 +1181,7 @@ class DataManagerDialog(QDialog):
         del_all_btn.clicked.connect(self.delete_all_records)
         actions_layout.addWidget(del_all_btn)
 
-        clear_all_btn = QPushButton("🧹 一键清理系统垃圾")
+        clear_all_btn = QPushButton("一键清理系统垃圾")
         clear_all_btn.setFont(QFont("Microsoft YaHei", 11))
         clear_all_btn.setMinimumHeight(45)
         clear_all_btn.setCursor(Qt.PointingHandCursor)
@@ -704,7 +1189,7 @@ class DataManagerDialog(QDialog):
         clear_all_btn.clicked.connect(self.clear_all_junk)
         actions_layout.addWidget(clear_all_btn)
 
-        open_folder_btn = QPushButton("📂 打开数据文件夹")
+        open_folder_btn = QPushButton("打开数据文件夹")
         open_folder_btn.setFont(QFont("Microsoft YaHei", 11))
         open_folder_btn.setMinimumHeight(45)
         open_folder_btn.setCursor(Qt.PointingHandCursor)
@@ -717,12 +1202,12 @@ class DataManagerDialog(QDialog):
         scroll_area.setWidget(scroll_content)
         outer_layout.addWidget(scroll_area, 1)
 
-        refresh_btn = QPushButton("🔄 刷新统计")
-        refresh_btn.setFont(QFont("Microsoft YaHei", 10))
-        refresh_btn.setMinimumHeight(40)
-        refresh_btn.setMinimumWidth(120)
-        refresh_btn.setCursor(Qt.PointingHandCursor)
-        refresh_btn.clicked.connect(self.refresh_stats)
+        self.dm_refresh_btn = QPushButton("刷新统计")
+        self.dm_refresh_btn.setFont(QFont("Microsoft YaHei", 10))
+        self.dm_refresh_btn.setMinimumHeight(40)
+        self.dm_refresh_btn.setMinimumWidth(120)
+        self.dm_refresh_btn.setCursor(Qt.PointingHandCursor)
+        self.dm_refresh_btn.clicked.connect(self._on_dm_refresh_clicked)
 
         close_btn = QPushButton("关闭")
         close_btn.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
@@ -732,15 +1217,67 @@ class DataManagerDialog(QDialog):
         close_btn.clicked.connect(self.accept)
 
         btn_layout = QHBoxLayout()
-        btn_layout.addWidget(refresh_btn)
+        btn_layout.addWidget(self.dm_refresh_btn)
         btn_layout.addStretch()
         btn_layout.addWidget(close_btn)
         outer_layout.addLayout(btn_layout)
 
+    def _on_dm_refresh_clicked(self):
+        """数据管理刷新按钮点击（带动画效果）"""
+        try:
+            self.dm_refresh_btn.setText("刷新中...")
+            self.dm_refresh_btn.setEnabled(False)
+            # 统计区域闪烁效果
+            original_style = self.stats_label.styleSheet()
+            self.stats_label.setStyleSheet("padding: 12px; background-color: #E8E3DA; border-radius: 0px; border: 2px solid #C44B4F; font-weight: bold;")
+            from PyQt5.QtCore import QTimer
+            def _restore():
+                self.stats_label.setStyleSheet(original_style)
+                self.refresh_stats()
+                self.dm_refresh_btn.setText("刷新统计")
+                self.dm_refresh_btn.setEnabled(True)
+            QTimer.singleShot(300, _restore)
+        except Exception as e:
+            logger.error(f"刷新动画异常: {str(e)}")
+            self.refresh_stats()
+            self.dm_refresh_btn.setText("刷新统计")
+            self.dm_refresh_btn.setEnabled(True)
+
+    def refresh_path_info(self):
+        """刷新数据存储路径显示（动态适配不同根目录）"""
+        try:
+            app_dir = get_app_dir()
+            data_dir = get_user_data_dir()
+
+            def path_to_url(p):
+                return QUrl.fromLocalFile(os.path.abspath(p)).toString()
+
+            path_html = (
+                f"<div style='line-height: 1.8; font-size: 11pt;'>"
+                f"<p><b>程序目录：</b><br>"
+                f"<a href='{path_to_url(app_dir)}' style='color: #C44B4F;'>{app_dir}</a></p>"
+                f"<p><b>数据目录（所有用户数据保存在此）：</b><br>"
+                f"<a href='{path_to_url(data_dir)}' style='color: #C44B4F;'>{data_dir}</a></p>"
+                f"<p><b>数据结构说明：</b></p>"
+                f"<ul style='margin: 5px 0; padding-left: 20px; line-height: 2.0;'>"
+                f"<li><b>recordings/</b> —— 您的录音文件（可删除）</li>"
+                f"<li><b>models/</b> —— AI模型文件（<span style='color: #C44B4F; font-weight: bold;'>不可删除，删除后需重新下载约1GB</span>）</li>"
+                f"<li><b>logs/</b> —— 程序运行日志（可清除）</li>"
+                f"<li><b>temp/</b> —— 临时文件（可清除）</li>"
+                f"<li><b>cache/</b> —— 缓存文件（可清除）</li>"
+                f"<li><b>history.json</b> —— 历史记录（可删除）</li>"
+                f"</ul>"
+                f"</div>"
+            )
+            self.path_info.setText(path_html)
+        except Exception as e:
+            logger.error(f"刷新路径信息失败: {str(e)}")
+
     def refresh_stats(self):
         try:
+            self.refresh_path_info()
             stats = get_storage_stats()
-            stats_text = "<b>📊 存储统计：</b><br>"
+            stats_text = "<b>存储统计：</b><br>"
             for key, name in [('recordings', '录音文件'), ('models', 'AI模型'),
                               ('logs', '日志'), ('temp', '临时文件'), ('cache', '缓存')]:
                 if key in stats:
@@ -755,7 +1292,7 @@ class DataManagerDialog(QDialog):
 
     def delete_all_records(self):
         reply = QMessageBox.question(
-            self, "⚠️ 确认删除",
+            self, "确认删除",
             "确定要清空所有历史记录和录音文件吗？\n\n"
             "此操作不可恢复！\n"
             "（AI模型文件不会被删除）",
@@ -862,9 +1399,10 @@ class MainWindow(QMainWindow):
 
     应用程序的主界面窗口，集成所有功能模块：
     - 菜单栏：文件菜单（数据管理、退出）、帮助菜单
-    - 实时检测页面：录音控制、情绪分析、结果展示、运行日志
+    - 实时检测页面：录音控制、情绪分析、结果展示
     - 历史报告页面：历史记录列表、情绪趋势图
     - 底部操作区：数据管理按钮、版权声明
+    - Toast通知：错误/警告时弹窗提示
 
     工作流程：
     1. 启动时显示欢迎向导（首次运行）
@@ -893,13 +1431,15 @@ class MainWindow(QMainWindow):
         self.current_audio_path = None
         self.record_start_time = None
         self.recognizer = None
-        self.history_manager = HistoryManager()
+        self.history_manager = HistoryManager(cleanup_callback=self._on_history_cleanup_needed)
         self.temp_files = []
         self._closing = False
 
         self.log_signal.connect(self._append_log_safe)
         self.model_loaded_signal.connect(self._on_model_loaded_safe)
         self.model_progress_signal.connect(self._append_log_safe)
+
+        self.toast_manager = ToastManager(self)
 
         self.init_ui()
         self.setup_menubar()
@@ -917,25 +1457,34 @@ class MainWindow(QMainWindow):
             dialog.exec_()
 
     def _append_log_safe(self, msg):
+        """ 记录日志，仅写入logger，不再显示在UI控件中 """
         try:
-            from datetime import datetime
-            timestamp = datetime.now().strftime("%H:%M:%S")
-            self.log_text.append(f"[{timestamp}] {msg}")
-            self.log_text.verticalScrollBar().setValue(self.log_text.verticalScrollBar().maximum())
+            logger.info(msg)
         except Exception:
             pass
 
     def append_log(self, msg):
-        self.log_signal.emit(msg)
+        """ 记录日志并在错误/警告时显示Toast通知 """
+        logger.info(msg)
+        # 仅对错误和警告显示Toast弹窗
+        msg_lower = msg.lower()
+        if '错误' in msg or '失败' in msg or 'error' in msg_lower or '异常' in msg:
+            if hasattr(self, 'toast_manager'):
+                self.toast_manager.show_toast(msg, level="error", duration=6000)
+        elif '警告' in msg or 'warning' in msg_lower or '注意' in msg:
+            if hasattr(self, 'toast_manager'):
+                self.toast_manager.show_toast(msg, level="warning", duration=4000)
 
     def _on_model_loaded_safe(self, success, error):
         if self._closing:
             return
+        # 重新启用模型切换按钮
+        self.model_switch_btn.setEnabled(True)
         if success:
-            self._append_log_safe("✅ 情绪识别模型加载完成，准备就绪！")
+            self._append_log_safe("情绪识别模型加载完成，准备就绪！")
             self.status_label.setText("● 准备就绪")
-            self.status_label.setStyleSheet("color: #a8ffb8; background-color: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 20px;")
-            self.record_btn.setText("🎤  点击开始录音")
+            self.status_label.setStyleSheet("color: #FFFFFF; background-color: #2B2B2B; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
+            self.record_btn.setText("点击开始录音")
             self.record_btn.setProperty("isRecording", "false")
             self.record_btn.style().unpolish(self.record_btn)
             self.record_btn.style().polish(self.record_btn)
@@ -943,18 +1492,18 @@ class MainWindow(QMainWindow):
             logger.info("情绪识别模型加载成功")
         else:
             error_msg = f"模型加载失败: {error}"
-            self._append_log_safe(f"❌ {error_msg}")
+            self._append_log_safe(f"{error_msg}")
             logger.error(error_msg)
             self.status_label.setText("● 模型加载失败")
-            self.status_label.setStyleSheet("color: #ff6b6b; background-color: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 20px;")
+            self.status_label.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
             QMessageBox.warning(
                 self, "模型加载提示",
                 f"情绪识别模型加载失败:\n{error}\n\n"
                 "请检查：\n"
                 "1. 网络连接是否正常（首次需要下载模型）\n"
-                "2. 磁盘空间是否充足（约需要1GB）\n"
+                "2. 磁盘空间是否充足\n"
                 "3. 程序文件夹是否有写入权限\n\n"
-                "您可以尝试重启程序重新加载"
+                "您可以尝试重启程序或切换其他模型"
             )
 
     @exception_safe()
@@ -962,6 +1511,11 @@ class MainWindow(QMainWindow):
         self.append_log("系统启动中，正在准备界面...")
         self.append_log(f"程序目录: {get_app_dir()}")
         self.append_log(f"数据目录: {get_user_data_dir()}")
+
+        current_model = load_model_config()
+        from emotion_recognizer import AVAILABLE_MODELS
+        model_display = AVAILABLE_MODELS.get(current_model, {}).get('display', current_model)
+        self.append_log(f"当前选择模型: {model_display}")
         self.append_log("正在后台加载情绪识别模型，请稍候...")
         self.append_log("（首次使用需要下载模型，下载完成后下次启动会很快）")
 
@@ -970,7 +1524,7 @@ class MainWindow(QMainWindow):
                 if not self._closing:
                     self.model_progress_signal.emit(msg)
 
-            self.recognizer = EmotionRecognizer(progress_callback=on_progress)
+            self.recognizer = EmotionRecognizer(progress_callback=on_progress, model_name=current_model)
 
             def on_loaded(success, error):
                 if not self._closing:
@@ -984,12 +1538,18 @@ class MainWindow(QMainWindow):
 
     @exception_safe()
     def init_ui(self):
-        self.setWindowTitle("语音情绪识别系统 v1.0 - 便携版")
+        self.setWindowTitle("语音情绪识别系统 v1.1 - 便携版")
         self.setMinimumSize(1200, 800)
         self.resize(1400, 900)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
+
+        # 构成主义几何背景
+        self._bg_widget = ConstructivistBackground(central_widget)
+        self._bg_widget.setGeometry(central_widget.rect())
+        self._bg_widget.lower()
+
         main_layout = QVBoxLayout(central_widget)
         main_layout.setSpacing(10)
         main_layout.setContentsMargins(15, 15, 15, 15)
@@ -1000,15 +1560,44 @@ class MainWindow(QMainWindow):
         header_layout = QHBoxLayout(header_frame)
         header_layout.setContentsMargins(25, 12, 25, 12)
 
-        title_label = QLabel("🎙️ 语音情绪识别系统")
-        title_label.setFont(QFont("Microsoft YaHei", 20, QFont.Bold))
+        # 标题左侧红色三角装饰块
+        title_accent = QLabel()
+        title_accent.setFixedSize(12, 28)
+        title_accent.setStyleSheet("background-color: #C44B4F;")
+        header_layout.addWidget(title_accent)
+
+        title_label = QLabel("语音情绪识别系统")
+        title_label.setFont(QFont("Microsoft YaHei", 26, QFont.Black))
         title_label.setObjectName("headerTitle")
         header_layout.addWidget(title_label)
         header_layout.addStretch()
 
+        # 模型切换按钮
+        self.model_switch_btn = QPushButton("切换模型")
+        self.model_switch_btn.setFont(QFont("Microsoft YaHei", 10))
+        self.model_switch_btn.setCursor(Qt.PointingHandCursor)
+        self.model_switch_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #F2EDE4;
+                color: #2B2B2B;
+                border: 2px solid #2B2B2B;
+                border-radius: 2px;
+                padding: 6px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #2B2B2B;
+                color: #FFFFFF;
+                border-color: #2B2B2B;
+            }
+        """)
+        self.model_switch_btn.clicked.connect(self.show_model_switch_dialog)
+        header_layout.addWidget(self.model_switch_btn)
+
         self.status_label = QLabel("● 正在启动...")
-        self.status_label.setFont(QFont("Microsoft YaHei", 12))
+        self.status_label.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
         self.status_label.setObjectName("statusLoading")
+        self.status_label.setStyleSheet("color: #FFFFFF; background-color: #8A8580; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
         header_layout.addWidget(self.status_label)
 
         main_layout.addWidget(header_frame)
@@ -1030,7 +1619,7 @@ class MainWindow(QMainWindow):
 
         file_menu = menubar.addMenu("文件")
 
-        data_mgr_action = QAction("💾 数据管理", self)
+        data_mgr_action = QAction("数据管理", self)
         data_mgr_action.setShortcut("Ctrl+D")
         data_mgr_action.triggered.connect(self.show_data_manager)
         file_menu.addAction(data_mgr_action)
@@ -1048,6 +1637,78 @@ class MainWindow(QMainWindow):
         dialog.exec_()
 
     @exception_safe()
+    def show_model_switch_dialog(self, checked=False):
+        """显示模型切换对话框，允许用户在运行时切换模型"""
+        if not self.recognizer:
+            QMessageBox.warning(self, "提示", "识别器未初始化，请稍候")
+            return
+        if self.is_recording or self.is_analyzing:
+            QMessageBox.warning(self, "提示", "请等当前录音/分析完成后再切换模型")
+            return
+        if self.recognizer.loading:
+            QMessageBox.warning(self, "提示", "模型正在加载中，请稍候")
+            return
+
+        current_model = self.recognizer.model_name
+        dialog = ModelSwitchDialog(current_model, self)
+        if dialog.exec_() == QDialog.Accepted:
+            target_model = dialog.get_selected_model()
+            if target_model == current_model and self.recognizer.loaded:
+                self.append_log("当前已是该模型，无需切换")
+                return
+            self._do_switch_model(target_model)
+
+    def _do_switch_model(self, target_model):
+        """执行模型切换逻辑"""
+        from emotion_recognizer import AVAILABLE_MODELS
+        model_info = AVAILABLE_MODELS.get(target_model, {})
+        model_display = model_info.get('display', target_model)
+        model_size = model_info.get('size', '未知')
+
+        # 检查目标模型是否已下载
+        if not is_model_downloaded(target_model):
+            reply = QMessageBox.question(
+                self, "模型下载确认",
+                f"模型 [{model_display}] 尚未下载。\n\n"
+                f"需要下载约 {model_size} 的模型文件，是否继续？\n"
+                f"（请确保网络连接正常）",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                self.append_log("用户取消模型切换")
+                return
+
+        # 开始切换
+        self.append_log(f"正在切换到模型 [{model_display}]...")
+        self.record_btn.setEnabled(False)
+        self.model_switch_btn.setEnabled(False)
+        self.status_label.setText("● 正在切换模型...")
+        self.status_label.setStyleSheet("color: #FFFFFF; background-color: #8A8580; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
+
+        def on_progress(msg):
+            if not self._closing:
+                self.model_progress_signal.emit(msg)
+
+        # 确保进度回调生效
+        self.recognizer._progress_callbacks = [on_progress]
+
+        def on_switch_done(success, error):
+            if self._closing:
+                return
+            self.model_loaded_signal.emit(success, error or "")
+            if success:
+                # 更新底部版权标签
+                try:
+                    self.credit_label.setText(
+                        f"Powered by {target_model} (ModelScope/达摩院, Apache-2.0) | "
+                        "便携模式 - 数据保存在程序目录 | 仅供个人非商用参考使用"
+                    )
+                except Exception:
+                    pass
+
+        self.recognizer.switch_model(target_model, callback=on_switch_done)
+
+    @exception_safe()
     def create_realtime_tab(self):
         realtime_widget = QWidget()
         layout = QVBoxLayout(realtime_widget)
@@ -1062,14 +1723,14 @@ class MainWindow(QMainWindow):
         left_layout.setSpacing(12)
         left_layout.setContentsMargins(5, 5, 5, 5)
 
-        control_group = QGroupBox("🎤 录音控制")
+        control_group = QGroupBox("录音控制")
         control_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         control_group.setObjectName("controlGroup")
         control_layout = QVBoxLayout(control_group)
         control_layout.setSpacing(12)
         control_layout.setContentsMargins(20, 25, 20, 20)
 
-        self.record_btn = QPushButton("🎤  模型加载中...")
+        self.record_btn = QPushButton("模型加载中...")
         self.record_btn.setFont(QFont("Microsoft YaHei", 18, QFont.Bold))
         self.record_btn.setMinimumHeight(100)
         self.record_btn.setObjectName("recordBtn")
@@ -1082,8 +1743,8 @@ class MainWindow(QMainWindow):
         info_grid.setSpacing(12)
         info_grid.setColumnStretch(1, 1)
 
-        duration_title = QLabel("⏱️ 录音时长")
-        duration_title.setFont(QFont("Microsoft YaHei", 11))
+        duration_title = QLabel("录音时长")
+        duration_title.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
         info_grid.addWidget(duration_title, 0, 0)
 
         self.duration_display = QLabel("00:00")
@@ -1093,8 +1754,8 @@ class MainWindow(QMainWindow):
         self.duration_display.setObjectName("durationLabel")
         info_grid.addWidget(self.duration_display, 0, 1)
 
-        progress_title = QLabel("📊 处理进度")
-        progress_title.setFont(QFont("Microsoft YaHei", 11))
+        progress_title = QLabel("处理进度")
+        progress_title.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
         info_grid.addWidget(progress_title, 1, 0)
 
         self.record_progress = QProgressBar()
@@ -1108,26 +1769,35 @@ class MainWindow(QMainWindow):
         control_layout.addLayout(info_grid)
         left_layout.addWidget(control_group)
 
-        result_group = QGroupBox("📊 检测结果")
+        result_group = QGroupBox("检测结果")
         result_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         result_group.setObjectName("resultGroup")
         self.result_group = result_group
         result_layout = QVBoxLayout(result_group)
-        result_layout.setSpacing(15)
-        result_layout.setContentsMargins(20, 25, 20, 20)
+        result_layout.setSpacing(18)
+        result_layout.setContentsMargins(25, 25, 25, 25)
 
         cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(12)
+        cards_layout.setSpacing(16)
 
-        self.score_card = ScoreCard("情绪稳定度 (0-10)")
-        self.level_card = ScoreCard("情绪状态")
-        self.emotion_card = ScoreCard("主要情绪")
+        self.score_card = ScoreCard("情绪稳定度 (0-10)", accent_color="#C44B4F")
+        self.level_card = ScoreCard("情绪状态", accent_color="#C44B4F")
+        self.emotion_card = ScoreCard("主要情绪", accent_color="#C44B4F")
+        self.compound_card = ScoreCard("复合情绪", accent_color="#C44B4F")
 
         cards_layout.addWidget(self.score_card)
         cards_layout.addWidget(self.level_card)
         cards_layout.addWidget(self.emotion_card)
+        cards_layout.addWidget(self.compound_card)
 
         result_layout.addLayout(cards_layout)
+
+        # 分数说明
+        stability_hint = QLabel("情绪稳定度分数越低表示情绪越稳定，0分最稳定，10分波动最大")
+        stability_hint.setFont(QFont("Microsoft YaHei", 10))
+        stability_hint.setAlignment(Qt.AlignCenter)
+        stability_hint.setStyleSheet("color: #8A8580; padding: 4px 0; font-weight: bold;")
+        result_layout.addWidget(stability_hint)
 
         self.warning_label = QLabel("")
         self.warning_label.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
@@ -1138,18 +1808,18 @@ class MainWindow(QMainWindow):
         self.warning_label.hide()
         result_layout.addWidget(self.warning_label)
 
-        prob_title = QLabel("📈 情绪概率分布")
+        prob_title = QLabel("情绪概率分布")
         prob_title.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         result_layout.addWidget(prob_title)
 
         self.prob_bars = {}
         self.prob_labels = {}
-        emotions = [("平静", "#95a5a6"), ("开心", "#f1c40f"), ("惊讶", "#1abc9c"),
-                    ("悲伤", "#3498db"), ("愤怒", "#e74c3c"), ("恐惧", "#9b59b6"),
-                    ("厌恶", "#e67e22")]
+        emotions = [("平静", "#C44B4F"), ("开心", "#C44B4F"), ("惊讶", "#C44B4F"),
+                    ("悲伤", "#C44B4F"), ("愤怒", "#C44B4F"), ("恐惧", "#C44B4F"),
+                    ("厌恶", "#C44B4F")]
         for emotion, color in emotions:
             bar_row = QHBoxLayout()
-            bar_row.setSpacing(10)
+            bar_row.setSpacing(12)
 
             label = QLabel(emotion)
             label.setFont(QFont("Microsoft YaHei", 11))
@@ -1162,8 +1832,8 @@ class MainWindow(QMainWindow):
             bar.setValue(0)
             bar.setTextVisible(False)
             bar.setObjectName(f"probBar_{emotion}")
-            bar.setMinimumHeight(28)
-            bar.setMaximumHeight(28)
+            bar.setMinimumHeight(36)
+            bar.setMaximumHeight(36)
             bar.setProperty("barColor", color)
             self.prob_bars[emotion] = bar
             bar_row.addWidget(bar, 1)
@@ -1179,19 +1849,6 @@ class MainWindow(QMainWindow):
 
             result_layout.addLayout(bar_row)
 
-        suggestion_group = QGroupBox("💡 调节建议")
-        suggestion_group.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
-        suggestion_group.setObjectName("suggestionGroup")
-        suggestion_layout = QVBoxLayout(suggestion_group)
-        suggestion_layout.setContentsMargins(15, 20, 15, 15)
-        self.suggestion_text = QTextEdit()
-        self.suggestion_text.setReadOnly(True)
-        self.suggestion_text.setMinimumHeight(120)
-        self.suggestion_text.setPlaceholderText("等待模型加载完成后，进行录音检测即可看到结果...")
-        self.suggestion_text.setFont(QFont("Microsoft YaHei", 11))
-        self.suggestion_text.setObjectName("suggestionText")
-        suggestion_layout.addWidget(self.suggestion_text)
-        result_layout.addWidget(suggestion_group)
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -1207,48 +1864,83 @@ class MainWindow(QMainWindow):
         right_layout.setSpacing(12)
         right_layout.setContentsMargins(5, 5, 5, 5)
 
-        log_group = QGroupBox("📝 运行日志")
-        log_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
-        log_group.setObjectName("logGroup")
-        log_layout = QVBoxLayout(log_group)
-        log_layout.setContentsMargins(15, 25, 15, 15)
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
-        self.log_text.setFont(QFont("Consolas", 10))
-        self.log_text.setObjectName("logText")
-        log_layout.addWidget(self.log_text)
-        right_layout.addWidget(log_group, 1)
-
-        quick_guide = QGroupBox("📖 快速指南")
+        quick_guide = QGroupBox("快速指南")
         quick_guide.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         quick_guide.setObjectName("guideGroup")
         guide_layout = QVBoxLayout(quick_guide)
         guide_layout.setContentsMargins(15, 25, 15, 15)
-        guide_text = QLabel(
-            "<div style='line-height: 1.8; font-size: 11pt;'>"
-            "<b>使用流程：</b><br>"
-            "1️⃣ 等待模型加载完成（首次需下载）<br>"
-            "2️⃣ 点击绿色「开始录音」按钮<br>"
-            "3️⃣ 自然地说出您的感受<br>"
-            "4️⃣ 点击红色「停止录音」按钮<br>"
-            "5️⃣ 等待几秒查看分析结果<br><br>"
-            "<b>提示：</b>录音时长建议3-30秒，保持环境安静<br>"
-            "<b>便携模式：</b>所有数据保存在程序文件夹"
+        guide_layout.setSpacing(10)
+
+        # 使用流程 - 红色标题条
+        steps_title = QLabel("使用流程")
+        steps_title.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
+        steps_title.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 6px 12px; font-weight: bold;")
+        guide_layout.addWidget(steps_title)
+
+        steps_text = QLabel(
+            "<div style='line-height: 2.2; font-size: 10.5pt; color: #2B2B2B;'>"
+            "<div style='background: #F2EDE4; padding: 6px 12px; margin: 3px 0; border-left: 4px solid #C44B4F;'>"
+            "<b style='color: #C44B4F;'>1</b>\u3000等待模型加载完成"
+            "</div>"
+            "<div style='background: #F2EDE4; padding: 6px 12px; margin: 3px 0; border-left: 4px solid #C44B4F;'>"
+            "<b style='color: #C44B4F;'>2</b>\u3000点击「开始录音」按钮"
+            "</div>"
+            "<div style='background: #F2EDE4; padding: 6px 12px; margin: 3px 0; border-left: 4px solid #C44B4F;'>"
+            "<b style='color: #C44B4F;'>3</b>\u3000自然地说出您的感受（3-30秒）"
+            "</div>"
+            "<div style='background: #F2EDE4; padding: 6px 12px; margin: 3px 0; border-left: 4px solid #C44B4F;'>"
+            "<b style='color: #C44B4F;'>4</b>\u3000点击「停止录音」按钮"
+            "</div>"
+            "<div style='background: #F2EDE4; padding: 6px 12px; margin: 3px 0; border-left: 4px solid #C44B4F;'>"
+            "<b style='color: #C44B4F;'>5</b>\u3000查看情绪分析结果"
+            "</div>"
             "</div>"
         )
-        guide_text.setWordWrap(True)
-        guide_text.setTextFormat(Qt.RichText)
-        guide_layout.addWidget(guide_text)
+        steps_text.setWordWrap(True)
+        steps_text.setTextFormat(Qt.RichText)
+        guide_layout.addWidget(steps_text)
+
+        # 功能说明
+        features_title = QLabel("功能说明")
+        features_title.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
+        features_title.setStyleSheet("color: #FFFFFF; background-color: #2B2B2B; padding: 6px 12px; font-weight: bold; margin-top: 8px;")
+        guide_layout.addWidget(features_title)
+
+        features_text = QLabel(
+            "<div style='line-height: 1.9; font-size: 10pt; color: #2B2B2B;'>"
+            "\u25aa <b>多模型支持：</b>可切换 Large/Base/Seed 三种模型<br>"
+            "\u25aa <b>7种情绪识别：</b>平静、开心、惊讶、悲伤、愤怒、恐惧、厌恶<br>"
+            "\u25aa <b>复合情绪检测：</b>自动识别焦虑、挫败等复合情绪<br>"
+            "\u25aa <b>情绪稳定度：</b>0-10分，分数越低越稳定<br>"
+            "\u25aa <b>历史报告：</b>查看历史记录与情绪趋势图<br>"
+            "\u25aa <b>数据管理：</b>清理录音、缓存等数据文件<br>"
+            "\u25aa <b>便携模式：</b>所有数据保存在程序文件夹"
+            "</div>"
+        )
+        features_text.setWordWrap(True)
+        features_text.setTextFormat(Qt.RichText)
+        guide_layout.addWidget(features_text)
+
+        # 提示
+        tip_label = QLabel(
+            "<div style='background: #F2EDE4; padding: 10px 12px; margin-top: 6px; font-size: 10pt; color: #2B2B2B; border: 2px solid #2B2B2B;'>"
+            "<b>小贴士：</b>在安静的环境下录音，效果会更好"
+            "</div>"
+        )
+        tip_label.setWordWrap(True)
+        tip_label.setTextFormat(Qt.RichText)
+        guide_layout.addWidget(tip_label)
+
         right_layout.addWidget(quick_guide)
 
         content_splitter.addWidget(right_panel)
 
-        content_splitter.setStretchFactor(0, 3)
-        content_splitter.setStretchFactor(1, 1)
-        content_splitter.setSizes([850, 350])
+        content_splitter.setStretchFactor(0, 7)
+        content_splitter.setStretchFactor(1, 3)
+        content_splitter.setSizes([840, 360])
 
         layout.addWidget(content_splitter)
-        self.tab_widget.addTab(realtime_widget, "🎙️ 实时检测")
+        self.tab_widget.addTab(realtime_widget, "实时检测")
 
     @exception_safe()
     def create_history_tab(self):
@@ -1259,13 +1951,13 @@ class MainWindow(QMainWindow):
         history_btn_layout = QHBoxLayout()
         history_btn_layout.setSpacing(10)
 
-        refresh_btn = QPushButton("🔄 刷新列表")
-        refresh_btn.setFont(QFont("Microsoft YaHei", 11))
-        refresh_btn.setMinimumHeight(38)
-        refresh_btn.setMinimumWidth(120)
-        refresh_btn.setCursor(Qt.PointingHandCursor)
-        refresh_btn.clicked.connect(self.refresh_history)
-        history_btn_layout.addWidget(refresh_btn)
+        self.history_refresh_btn = QPushButton("刷新列表")
+        self.history_refresh_btn.setFont(QFont("Microsoft YaHei", 11))
+        self.history_refresh_btn.setMinimumHeight(38)
+        self.history_refresh_btn.setMinimumWidth(120)
+        self.history_refresh_btn.setCursor(Qt.PointingHandCursor)
+        self.history_refresh_btn.clicked.connect(self._on_history_refresh_clicked)
+        history_btn_layout.addWidget(self.history_refresh_btn)
 
         history_btn_layout.addStretch()
 
@@ -1280,7 +1972,7 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Vertical)
         splitter.setObjectName("historySplitter")
 
-        list_group = QGroupBox("📋 历史记录")
+        list_group = QGroupBox("历史记录")
         list_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         list_group.setObjectName("historyGroup")
         list_layout = QVBoxLayout(list_group)
@@ -1288,37 +1980,39 @@ class MainWindow(QMainWindow):
         self.history_list = QListWidget()
         self.history_list.setFont(QFont("Microsoft YaHei", 11))
         self.history_list.setObjectName("historyList")
-        self.history_list.setMinimumHeight(220)
+        self.history_list.setMinimumHeight(180)
+        self.history_list.setMaximumHeight(280)
         self.history_list.setSpacing(2)
         self.history_list.setSelectionMode(QListWidget.NoSelection)
         list_layout.addWidget(self.history_list)
         splitter.addWidget(list_group)
 
-        plot_group = QGroupBox("📈 情绪趋势图")
+        plot_group = QGroupBox("情绪趋势图")
         plot_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         plot_group.setObjectName("plotGroup")
         plot_layout = QVBoxLayout(plot_group)
-        plot_layout.setContentsMargins(15, 25, 15, 15)
+        plot_layout.setContentsMargins(15, 25, 15, 10)
 
         if MATPLOTLIB_AVAILABLE:
-            self.canvas = MplCanvas(self, width=10, height=5, dpi=100)
+            self.canvas = MplCanvas(self, width=10, height=7, dpi=100)
+            self.canvas.setMinimumHeight(350)
             plot_layout.addWidget(self.canvas)
         else:
             plot_placeholder = QLabel(
-                "📊 绘图库未安装\n\n趋势图功能暂不可用"
+                "绘图库未安装\n\n趋势图功能暂不可用"
             )
             plot_placeholder.setAlignment(Qt.AlignCenter)
             plot_placeholder.setFont(QFont("Microsoft YaHei", 12))
-            plot_placeholder.setStyleSheet("color: #7f8c8d; padding: 40px;")
+            plot_placeholder.setStyleSheet("color: #8C8680; padding: 40px;")
             plot_layout.addWidget(plot_placeholder)
 
         splitter.addWidget(plot_group)
-        splitter.setSizes([350, 450])
+        splitter.setSizes([250, 550])
         splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(1, 2)
 
         layout.addWidget(splitter)
-        self.tab_widget.addTab(history_widget, "📋 历史报告")
+        self.tab_widget.addTab(history_widget, "历史报告")
 
     @exception_safe()
     def create_bottom_buttons(self, parent_layout):
@@ -1332,7 +2026,7 @@ class MainWindow(QMainWindow):
         btn_layout.setSpacing(15)
         btn_layout.setContentsMargins(20, 8, 20, 8)
 
-        data_btn = QPushButton("💾  数据管理")
+        data_btn = QPushButton("数据管理")
         data_btn.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         data_btn.setMinimumHeight(48)
         data_btn.setMinimumWidth(150)
@@ -1345,15 +2039,16 @@ class MainWindow(QMainWindow):
 
         bottom_container.addWidget(btn_frame)
 
-        credit_label = QLabel(
-            "Powered by emotion2vec_plus_large (ModelScope/达摩院, Apache-2.0) | "
+        current_model = load_model_config()
+        self.credit_label = QLabel(
+            f"Powered by {current_model} (ModelScope/达摩院, Apache-2.0) | "
             "便携模式 - 数据保存在程序目录 | 仅供个人非商用参考使用"
         )
-        credit_label.setAlignment(Qt.AlignCenter)
-        credit_label.setFont(QFont("Microsoft YaHei", 8))
-        credit_label.setObjectName("creditLabel")
-        credit_label.setWordWrap(True)
-        bottom_container.addWidget(credit_label)
+        self.credit_label.setAlignment(Qt.AlignCenter)
+        self.credit_label.setFont(QFont("Microsoft YaHei", 8, QFont.Bold))
+        self.credit_label.setObjectName("creditLabel")
+        self.credit_label.setWordWrap(True)
+        bottom_container.addWidget(self.credit_label)
 
         parent_layout.addLayout(bottom_container)
 
@@ -1361,276 +2056,277 @@ class MainWindow(QMainWindow):
     def setup_styles(self):
         qss = """
         QMainWindow {
-            background-color: #f5f7fa;
+            background-color: #F2EDE4;
         }
 
         #headerFrame {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                stop:0 #667eea, stop:0.5 #764ba2, stop:1 #f093fb);
-            border-radius: 16px;
+            background-color: #F2EDE4;
+            border: 3px solid #2B2B2B;
+            border-radius: 0px;
         }
 
         #headerTitle {
-            color: white;
+            color: #2B2B2B;
+            font-family: "Microsoft YaHei", "SimHei", "Arial Black";
+            font-weight: 900;
+            font-style: oblique;
         }
 
         #statusReady {
-            color: #a8ffb8;
-            background-color: rgba(255,255,255,0.15);
-            padding: 8px 20px;
-            border-radius: 20px;
+            color: #FFFFFF;
+            background-color: #2B2B2B;
+            padding: 8px 18px;
+            border-radius: 0px;
+            border: 2px solid #2B2B2B;
+            font-weight: bold;
         }
 
         #statusLoading {
-            color: #ffd700;
-            background-color: rgba(255,255,255,0.15);
-            padding: 8px 20px;
-            border-radius: 20px;
+            color: #FFFFFF;
+            background-color: #8A8580;
+            padding: 8px 18px;
+            border-radius: 0px;
+            border: 2px solid #2B2B2B;
+            font-weight: bold;
         }
 
         QMenuBar {
-            background-color: white;
-            border-bottom: 1px solid #e8ecf1;
-            font-family: "Microsoft YaHei";
+            background-color: #F2EDE4;
+            border-bottom: 3px solid #2B2B2B;
+            font-family: "Microsoft YaHei", "SimHei", "Arial Black";
             font-size: 11px;
+            font-weight: bold;
         }
 
         QMenuBar::item {
             padding: 10px 18px;
             background-color: transparent;
+            border-radius: 0px;
         }
 
         QMenuBar::item:selected {
-            background-color: #667eea;
-            color: white;
-            border-radius: 6px;
+            background-color: #2B2B2B;
+            color: #FFFFFF;
         }
 
         QMenu {
-            background-color: white;
-            border: 1px solid #e8ecf1;
-            font-family: "Microsoft YaHei";
+            background-color: #F2EDE4;
+            border: 2px solid #2B2B2B;
+            font-family: "Microsoft YaHei", "SimHei", "Arial Black";
             font-size: 11px;
-            border-radius: 8px;
-            padding: 5px;
+            font-weight: bold;
+            border-radius: 0px;
+            padding: 6px;
         }
 
         QMenu::item {
             padding: 10px 25px;
-            border-radius: 6px;
+            border-radius: 0px;
         }
 
         QMenu::item:selected {
-            background-color: #667eea;
-            color: white;
+            background-color: #C44B4F;
+            color: #FFFFFF;
         }
 
         QTabWidget::pane {
             border: none;
-            border-radius: 16px;
+            border-radius: 0px;
             background-color: transparent;
         }
 
         QTabBar::tab {
-            background-color: #e8ecf1;
-            padding: 14px 35px;
-            margin-right: 5px;
-            border-top-left-radius: 12px;
-            border-top-right-radius: 12px;
+            background-color: #E8E3DA;
+            padding: 13px 32px;
+            margin-right: 4px;
+            border-top-left-radius: 0px;
+            border-top-right-radius: 0px;
             font-weight: bold;
             font-size: 13px;
+            font-family: "Microsoft YaHei", "SimHei", "Arial Black";
+            color: #2B2B2B;
+            border: 3px solid #2B2B2B;
+            border-bottom: none;
         }
 
         QTabBar::tab:selected {
-            background-color: white;
-            border-bottom: 4px solid #667eea;
-            color: #667eea;
+            background-color: #F2EDE4;
+            border-bottom: 3px solid #C44B4F;
+            color: #2B2B2B;
         }
 
         QTabBar::tab:hover:!selected {
-            background-color: #d5dbe3;
+            background-color: #C44B4F;
+            color: #FFFFFF;
         }
 
         QGroupBox {
-            border: 2px solid #e8ecf1;
-            border-radius: 16px;
+            border: 3px solid #2B2B2B;
+            border-radius: 0px;
             margin-top: 12px;
             padding-top: 20px;
-            background-color: white;
+            background-color: rgba(242, 237, 228, 220);
+            font-family: "Microsoft YaHei", "SimHei", "Arial Black";
+            font-weight: bold;
         }
 
         QGroupBox::title {
             subcontrol-origin: margin;
             left: 20px;
-            padding: 0 15px;
-            color: #2c3e50;
+            padding: 0 12px;
+            color: #2B2B2B;
+            font-weight: bold;
         }
 
         #recordBtn {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #95a5a6, stop:1 #7f8c8d);
+            background-color: #8A8580;
             color: white;
-            border: none;
-            border-radius: 20px;
+            border: 3px solid #2B2B2B;
+            border-radius: 2px;
             padding: 20px;
+            font-family: "Microsoft YaHei", "SimHei", "Arial Black";
+            font-weight: bold;
         }
 
         #recordBtn:enabled {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #43e97b, stop:1 #38f9d7);
+            background-color: #C44B4F;
         }
 
         #recordBtn:enabled:hover {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #3dd670, stop:1 #32e4c5);
+            background-color: #A33B3F;
         }
 
         #recordBtn:enabled:pressed {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #35c064, stop:1 #2ccdb0);
+            background-color: #8B2F32;
         }
 
         #recordBtn[isRecording="true"] {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #ff6b6b, stop:1 #ee5a6f);
+            background-color: #2B2B2B;
         }
 
         #recordBtn[isRecording="true"]:hover {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #ff5252, stop:1 #e0485c);
+            background-color: #1A1A1A;
         }
 
         #durationLabel {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                stop:0 #f8f9fa, stop:1 #e9ecef);
-            border-radius: 12px;
+            background-color: #F2EDE4;
+            border-radius: 0px;
             padding: 10px 20px;
-            color: #2c3e50;
-            border: 2px solid #dee2e6;
+            color: #2B2B2B;
+            border: 3px solid #2B2B2B;
+            font-weight: bold;
         }
 
         #recordProgress {
-            border: none;
-            border-radius: 12px;
-            background-color: #e9ecef;
+            border: 3px solid #2B2B2B;
+            border-radius: 0px;
+            background-color: #E8E3DA;
         }
 
         #recordProgress::chunk {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                stop:0 #667eea, stop:1 #764ba2);
-            border-radius: 12px;
+            background-color: #C44B4F;
+            border-radius: 0px;
         }
 
         #scoreCard {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #ffffff, stop:1 #f8f9fa);
-            border-radius: 16px;
-            border: 2px solid #e9ecef;
+            background-color: rgba(242, 237, 228, 240);
+            border-radius: 0px;
+            border: 3px solid #2B2B2B;
+        }
+
+        #scoreCard:hover {
+            border-color: #C44B4F;
         }
 
         #cardTitle {
-            color: #6c757d;
+            color: #2B2B2B;
+            font-weight: bold;
+            font-family: "Microsoft YaHei", "SimHei", "Arial Black";
         }
 
         #cardValue {
-            color: #667eea;
+            color: #2B2B2B;
+            font-family: "Consolas", "Courier New", monospace;
+            font-weight: bold;
         }
 
         #cardSub {
-            color: #adb5bd;
+            color: #8A8580;
+            font-weight: bold;
         }
 
         #warningLabel {
-            border-radius: 12px;
+            border-radius: 0px;
             padding: 12px 20px;
+            border: 3px solid #2B2B2B;
         }
 
         QProgressBar {
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
-            background-color: #f8f9fa;
+            border: 2px solid #2B2B2B;
+            border-radius: 0px;
+            background-color: #E8E3DA;
             text-align: center;
             font-weight: bold;
             font-size: 10pt;
+            font-family: "Microsoft YaHei", "SimHei", "Arial Black";
         }
 
         QProgressBar::chunk {
-            border-radius: 6px;
-            margin: 2px;
+            border-radius: 0px;
+            margin: 0px;
         }
 
-        #probBar_平静::chunk { background-color: #95a5a6; }
-        #probBar_开心::chunk { background-color: #f1c40f; }
-        #probBar_惊讶::chunk { background-color: #1abc9c; }
-        #probBar_悲伤::chunk { background-color: #3498db; }
-        #probBar_愤怒::chunk { background-color: #e74c3c; }
-        #probBar_恐惧::chunk { background-color: #9b59b6; }
-        #probBar_厌恶::chunk { background-color: #e67e22; }
-
-        #probLabel_平静 { color: #95a5a6; }
-        #probLabel_开心 { color: #d4ac0d; }
-        #probLabel_惊讶 { color: #16a085; }
-        #probLabel_悲伤 { color: #2980b9; }
-        #probLabel_愤怒 { color: #c0392b; }
-        #probLabel_恐惧 { color: #8e44ad; }
-        #probLabel_厌恶 { color: #d35400; }
-
-        #suggestionText {
-            background-color: #f8f9fa;
-            border: none;
-            border-radius: 10px;
-            padding: 12px;
-            color: #495057;
-            line-height: 1.6;
-        }
-
-        #logText {
-            background-color: #2d3436;
-            color: #00b894;
-            border: none;
-            border-radius: 12px;
-            padding: 15px;
-        }
+        #probBar_平静::chunk { background-color: #C44B4F; }
+        #probBar_开心::chunk { background-color: #C44B4F; }
+        #probBar_惊讶::chunk { background-color: #C44B4F; }
+        #probBar_悲伤::chunk { background-color: #C44B4F; }
+        #probBar_愤怒::chunk { background-color: #C44B4F; }
+        #probBar_恐惧::chunk { background-color: #C44B4F; }
+        #probBar_厌恶::chunk { background-color: #C44B4F; }
 
         #historyList {
-            border: 2px solid #e9ecef;
-            border-radius: 12px;
-            background-color: #fafbfc;
+            border: 3px solid #2B2B2B;
+            border-radius: 0px;
+            background-color: #F2EDE4;
             padding: 8px;
+            font-family: "Microsoft YaHei", "SimHei", "Arial Black";
+            font-weight: bold;
         }
 
         #historyList::item {
             padding: 12px 15px;
-            border-bottom: 1px solid #f1f3f5;
-            border-radius: 8px;
+            border-bottom: 1px solid #8A8580;
+            border-radius: 0px;
             margin: 2px 0;
         }
 
         #historyList::item:selected {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                stop:0 #667eea, stop:1 #764ba2);
+            background-color: #2B2B2B;
             color: white;
         }
 
         #historyList::item:hover:!selected {
-            background-color: #f1f3f5;
+            background-color: #E8E3DA;
+            color: #2B2B2B;
         }
 
         #countLabel {
-            color: #6c757d;
+            color: #2B2B2B;
             padding: 5px 10px;
+            font-weight: bold;
         }
 
         #dangerBtn {
-            background-color: #e74c3c;
+            background-color: #C44B4F;
             color: white;
-            border: none;
-            border-radius: 10px;
+            border: 3px solid #2B2B2B;
+            border-radius: 2px;
             padding: 8px 20px;
+            font-weight: bold;
         }
 
         #dangerBtn:hover {
-            background-color: #c0392b;
+            background-color: #A33B3F;
         }
 
         QScrollArea {
@@ -1640,19 +2336,19 @@ class MainWindow(QMainWindow):
 
         QScrollBar:vertical {
             border: none;
-            background: #f1f3f5;
+            background: #E8E3DA;
             width: 10px;
-            border-radius: 5px;
+            border-radius: 0px;
         }
 
         QScrollBar::handle:vertical {
-            background: #ced4da;
-            border-radius: 5px;
+            background: #2B2B2B;
+            border-radius: 0px;
             min-height: 30px;
         }
 
         QScrollBar::handle:vertical:hover {
-            background: #adb5bd;
+            background: #C44B4F;
         }
 
         QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
@@ -1660,46 +2356,56 @@ class MainWindow(QMainWindow):
         }
 
         #bottomBtnFrame {
-            background-color: white;
-            border-radius: 16px;
-            border: 2px solid #e9ecef;
+            background-color: #2B2B2B;
+            border-radius: 0px;
+            border: none;
         }
 
         #dataBtn {
-            background-color: #3498db;
-            color: white;
-            border: none;
-            border-radius: 12px;
-            padding: 12px 30px;
+            background-color: transparent;
+            color: #FFFFFF;
+            border: 2px solid #C44B4F;
+            border-radius: 2px;
+            padding: 12px 28px;
+            font-weight: bold;
+            font-family: "Microsoft YaHei", "SimHei", "Arial Black";
         }
 
         #dataBtn:hover {
-            background-color: #2980b9;
+            background-color: #C44B4F;
+            color: #FFFFFF;
         }
 
         #creditLabel {
-            color: #868e96;
+            color: #8A8580;
             padding: 5px;
+            font-weight: bold;
         }
 
         QPushButton {
             outline: none;
+            font-family: "Microsoft YaHei", "SimHei", "Arial Black";
+            font-weight: bold;
         }
 
         QPushButton:disabled {
-            background-color: #ced4da !important;
-            color: #868e96 !important;
+            background-color: #E8E3DA !important;
+            color: #8A8580 !important;
             cursor: not-allowed;
         }
 
         QSplitter::handle {
-            background-color: transparent;
-            width: 8px;
+            background-color: #2B2B2B;
+            width: 3px;
         }
 
         QSplitter::handle:hover {
-            background-color: #dee2e6;
-            border-radius: 4px;
+            background-color: #C44B4F;
+            border-radius: 0px;
+        }
+
+        QLabel {
+            font-family: "Microsoft YaHei", "SimHei", "Arial Black";
         }
         """
         self.setStyleSheet(qss)
@@ -1739,7 +2445,7 @@ class MainWindow(QMainWindow):
     def _reset_recording_ui(self):
         self.is_recording = False
         self.is_analyzing = False
-        self.record_btn.setText("🎤  点击开始录音")
+        self.record_btn.setText("点击开始录音")
         self.record_btn.setProperty("isRecording", "false")
         self.record_btn.style().unpolish(self.record_btn)
         self.record_btn.style().polish(self.record_btn)
@@ -1817,14 +2523,14 @@ class MainWindow(QMainWindow):
 
             self.is_recording = True
             self.is_analyzing = False
-            self.record_btn.setText("⏹️  点击停止录音")
+            self.record_btn.setText("点击停止录音")
             self.record_btn.setProperty("isRecording", "true")
             self.record_btn.style().unpolish(self.record_btn)
             self.record_btn.style().polish(self.record_btn)
             self.record_progress.setRange(0, 0)
             self.duration_display.setText("00:00")
             self.status_label.setText("● 正在录音...")
-            self.status_label.setStyleSheet("color: #ff6b6b; background-color: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 20px;")
+            self.status_label.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
 
             self.recording_thread.start()
 
@@ -1834,11 +2540,11 @@ class MainWindow(QMainWindow):
                 raise Exception("录音线程启动失败")
 
             self.record_btn.setEnabled(True)
-            self.append_log(f"✅ 录音已开始")
+            self.append_log(f"录音已开始")
             logger.info(f"开始录音: {self.current_audio_path}")
         except Exception as e:
             logger.error(f"启动录音失败: {str(e)}", exc_info=True)
-            self.append_log(f"❌ 启动录音失败: {str(e)}")
+            self.append_log(f"启动录音失败: {str(e)}")
             QMessageBox.critical(self, "错误", f"启动录音失败:\n{str(e)}")
             self._reset_recording_ui()
 
@@ -1852,10 +2558,10 @@ class MainWindow(QMainWindow):
                 return
 
             self.is_recording = False
-            self.record_btn.setText("💾  正在保存...")
+            self.record_btn.setText("正在保存...")
             self.record_btn.setEnabled(False)
             self.status_label.setText("● 处理中...")
-            self.status_label.setStyleSheet("color: #f39c12; background-color: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 20px;")
+            self.status_label.setStyleSheet("color: #FFFFFF; background-color: #8A8580; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
             self.record_progress.setRange(0, 100)
             self.record_progress.setValue(50)
 
@@ -1879,7 +2585,7 @@ class MainWindow(QMainWindow):
                         self._reset_recording_ui()
         except Exception as e:
             logger.error(f"停止录音异常: {str(e)}", exc_info=True)
-            self.append_log(f"❌ 停止录音异常: {str(e)}")
+            self.append_log(f"■ 停止录音异常: {str(e)}")
             QMessageBox.critical(self, "错误", f"停止录音失败:\n{str(e)}")
             self._reset_recording_ui()
 
@@ -1892,7 +2598,7 @@ class MainWindow(QMainWindow):
     @exception_safe()
     def on_recording_finished(self, output_path):
         self.is_recording = False
-        self.record_btn.setText("🎤  点击开始录音")
+        self.record_btn.setText("点击开始录音")
         self.record_btn.setProperty("isRecording", "false")
         self.record_btn.style().unpolish(self.record_btn)
         self.record_btn.style().polish(self.record_btn)
@@ -1916,7 +2622,7 @@ class MainWindow(QMainWindow):
                 self.append_log("录音时长过短，已取消分析")
                 self._reset_recording_ui()
                 self.status_label.setText("● 准备就绪")
-                self.status_label.setStyleSheet("color: #a8ffb8; background-color: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 20px;")
+                self.status_label.setStyleSheet("color: #FFFFFF; background-color: #2B2B2B; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
                 return
 
             if not os.path.exists(output_path) or os.path.getsize(output_path) < 1024:
@@ -1976,7 +2682,7 @@ class MainWindow(QMainWindow):
         self.append_log(f"分析异常: {error_msg}")
         logger.error(f"分析异常: {error_msg}")
         self.status_label.setText("● 分析失败")
-        self.status_label.setStyleSheet("color: #e74c3c; background-color: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 20px;")
+        self.status_label.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
         QMessageBox.critical(self, "分析错误", f"情绪分析过程发生错误:\n{error_msg}")
 
     @exception_safe()
@@ -2011,6 +2717,14 @@ class MainWindow(QMainWindow):
                 self.level_card.set_value(level, color)
                 self.emotion_card.set_value(main_emotion, "#3498db", f"置信度 {confidence:.1%}")
 
+                # 复合情绪卡片展示
+                compound_emotion = result.get('复合情绪', '')
+                compound_detail = result.get('复合情绪详情', None)
+                if compound_emotion:
+                    self.compound_card.set_value(compound_emotion, "#9B59B6", compound_detail.get('desc', '')[:20] if compound_detail else "")
+                else:
+                    self.compound_card.set_value("未检测到", "#95A5A6", "情绪状态较单一")
+
                 from emotion_recognizer import STABILITY_LEVELS
                 border_color = color
                 bg_color = border_color + "15"
@@ -2018,7 +2732,7 @@ class MainWindow(QMainWindow):
                 self.result_group.setStyleSheet(f"""
                     QGroupBox {{
                         border: 3px solid {border_color};
-                        border-radius: 16px;
+                        border-radius: 0px;
                         margin-top: 12px;
                         padding-top: 20px;
                         background-color: {bg_color};
@@ -2026,8 +2740,8 @@ class MainWindow(QMainWindow):
                     QGroupBox::title {{
                         subcontrol-origin: margin;
                         left: 20px;
-                        padding: 0 15px;
-                        color: #2c3e50;
+                        padding: 0 12px;
+                        color: #2B2B2B;
                         font-weight: bold;
                     }}
                 """)
@@ -2044,67 +2758,57 @@ class MainWindow(QMainWindow):
                         if emotion in self.prob_labels:
                             self.prob_labels[emotion].setText("0%")
 
-                tips_text = f"<div style='font-size: 11pt; line-height: 1.8;'>"
-                tips_text += f"<b>检测结果：</b>主要情绪为「{main_emotion}」，置信度 {confidence:.1%}"
-                if mixed_emotions:
-                    mixed_str = "、".join([f"{e}({p*100:.0f}%)" for e, p in mixed_emotions[:3]])
-                    tips_text += f"，同时检测到混合情绪：{mixed_str}"
-                tips_text += f"<br><br><b>情绪稳定度：</b>{score:.1f}/10 分（分数越高表示情绪波动越大）<br><br>"
-                tips_text += f"<b>💡 调节建议：</b><br>{advice}"
-                tips_text += "</div>"
-                self.suggestion_text.setHtml(tips_text)
 
                 result_copy = dict(result)
-                result_copy['suggestion_text'] = tips_text
                 result_copy['anxiety_score'] = score
                 self.history_manager.add_record(result_copy)
 
-                if score >= 6:
+                if score >= 6.5:
                     self.warning_label.show()
                     if score >= 8:
-                        self.warning_label.setText("⚠️ 情绪波动较大！建议立即进行深呼吸放松，必要时寻求亲友陪伴或专业帮助")
+                        self.warning_label.setText("情绪波动较大！建议立即进行深呼吸放松，必要时寻求亲友陪伴或专业帮助")
                         self.warning_label.setStyleSheet("""
-                            background-color: #f8d7da;
-                            color: #721c24;
-                            border: 2px solid #dc3545;
-                            border-radius: 12px;
+                            background-color: #F2EDE4;
+                            color: #C44B4F;
+                            border: 3px solid #C44B4F;
+                            border-radius: 0px;
                             padding: 12px 20px;
                             font-weight: bold;
                         """)
                         self.status_label.setText("● 情绪不稳定")
-                        self.status_label.setStyleSheet("color: #ff6b6b; background-color: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 20px;")
+                        self.status_label.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
                     else:
-                        self.warning_label.setText("⚠️ 情绪存在一定波动，建议适当休息放松")
+                        self.warning_label.setText("情绪存在一定波动，建议适当休息放松")
                         self.warning_label.setStyleSheet("""
-                            background-color: #fff3cd;
-                            color: #856404;
-                            border: 2px solid #ffc107;
-                            border-radius: 12px;
+                            background-color: #F2EDE4;
+                            color: #8A8580;
+                            border: 3px solid #8A8580;
+                            border-radius: 0px;
                             padding: 12px 20px;
                             font-weight: bold;
                         """)
                         self.status_label.setText("● 情绪波动")
-                        self.status_label.setStyleSheet("color: #f39c12; background-color: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 20px;")
+                        self.status_label.setStyleSheet("color: #FFFFFF; background-color: #8A8580; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
                 else:
                     self.warning_label.hide()
                     self.status_label.setText("● 情绪状态良好")
-                    self.status_label.setStyleSheet("color: #a8ffb8; background-color: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 20px;")
+                    self.status_label.setStyleSheet("color: #FFFFFF; background-color: #2B2B2B; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
 
-                self.append_log(f"分析完成 - 稳定度分数: {score:.1f}/10, 情绪状态: {level}, 主要情绪: {main_emotion}")
-                logger.info(f"分析完成 - 稳定度: {score:.1f}, 状态: {level}, 情绪: {main_emotion}")
+                self.append_log(f"分析完成 - 稳定度分数: {score:.1f}/10, 情绪状态: {level}, 主要情绪: {main_emotion}" + (f", 复合情绪: {compound_emotion}" if compound_emotion else ""))
+                logger.info(f"分析完成 - 稳定度: {score:.1f}, 状态: {level}, 情绪: {main_emotion}" + (f", 复合情绪: {compound_emotion}" if compound_emotion else ""))
             else:
                 error_msg = result.get('error', '未知错误')
                 QMessageBox.warning(self, "分析错误", f"情绪分析失败:\n{error_msg}")
                 self.append_log(f"分析错误: {error_msg}")
                 logger.error(f"分析失败: {error_msg}")
                 self.status_label.setText("● 分析失败")
-                self.status_label.setStyleSheet("color: #e74c3c; background-color: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 20px;")
+                self.status_label.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
         except Exception as e:
             logger.error(f"处理分析结果异常: {str(e)}", exc_info=True)
             self.append_log(f"处理分析结果异常: {str(e)}")
             QMessageBox.critical(self, "错误", f"处理分析结果失败:\n{str(e)}")
             self.status_label.setText("● 处理错误")
-            self.status_label.setStyleSheet("color: #e74c3c; background-color: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 20px;")
+            self.status_label.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
 
     @exception_safe()
     def on_tab_changed(self, index):
@@ -2114,6 +2818,26 @@ class MainWindow(QMainWindow):
                 self.refresh_history()
         except Exception as e:
             logger.error(f"切换标签页异常: {str(e)}", exc_info=True)
+
+    def _on_history_refresh_clicked(self):
+        """历史记录刷新按钮点击（带动画效果）"""
+        try:
+            self.history_refresh_btn.setText("刷新中...")
+            self.history_refresh_btn.setEnabled(False)
+            # 列表区域淡出效果
+            self.history_list.setStyleSheet("opacity: 0.3; border: 2px solid #2B2B2B; border-radius: 0px; background-color: #E8E3DA; padding: 8px;")
+            from PyQt5.QtCore import QTimer
+            def _do_refresh():
+                self.refresh_history()
+                self.history_list.setStyleSheet("")
+                self.history_refresh_btn.setText("刷新列表")
+                self.history_refresh_btn.setEnabled(True)
+            QTimer.singleShot(250, _do_refresh)
+        except Exception as e:
+            logger.error(f"刷新动画异常: {str(e)}")
+            self.refresh_history()
+            self.history_refresh_btn.setText("刷新列表")
+            self.history_refresh_btn.setEnabled(True)
 
     @exception_safe()
     def refresh_history(self):
@@ -2136,7 +2860,7 @@ class MainWindow(QMainWindow):
                         level = str(record.get('情绪状态等级', record.get('emotion_level', '未知')))
                         record_id = str(record.get('id', ''))
                         self.history_ids.append(record_id)
-                        item_text = f"⏰ {timestamp}  |  😊 情绪: {emotion}  |  📊 稳定度: {score:.1f}/10  |  🎯 状态: {level}"
+                        item_text = f"{timestamp}  |  情绪: {emotion}  |  稳定度: {score:.1f}/10  |  状态: {level}"
                         self.history_list.addItem(item_text)
                     except Exception as e:
                         logger.warning(f"跳过无效记录: {str(e)}")
@@ -2148,11 +2872,22 @@ class MainWindow(QMainWindow):
             logger.error(f"刷新历史记录异常: {str(e)}", exc_info=True)
             self.append_log(f"刷新历史记录失败: {str(e)}")
 
+    def _on_history_cleanup_needed(self, count):
+        """历史记录达到阈值时，通知用户即将自动清理"""
+        try:
+            QMessageBox.information(
+                self, "历史记录管理",
+                f"历史记录已达到50条，系统将自动删除最早的 {count} 条记录。\n\n"
+                f"被删除记录的音频文件也会一并清除。"
+            )
+        except Exception:
+            pass
+
     @exception_safe()
     def clear_all_history(self):
         try:
             reply = QMessageBox.question(
-                self, "⚠️ 确认清空",
+                self, "确认清空",
                 "确定要清空所有历史记录和录音文件吗？\n\n"
                 "此操作不可恢复！\n"
                 "（AI模型文件不会被删除）",
@@ -2205,6 +2940,12 @@ class MainWindow(QMainWindow):
                 logger.warning(f"清理临时录音目录失败: {str(e)}")
 
     @exception_safe()
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, '_bg_widget'):
+            self._bg_widget.setGeometry(self.centralWidget().rect())
+
+    @exception_safe()
     def closeEvent(self, event):
         try:
             self._closing = True
@@ -2235,6 +2976,7 @@ class MainWindow(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     app.setFont(QFont("Microsoft YaHei", 10))
+    app.setStyle("Fusion")
     window = MainWindow()
     window.showMaximized()
     sys.exit(app.exec_())

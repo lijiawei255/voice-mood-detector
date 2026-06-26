@@ -22,6 +22,7 @@
 
 import os
 import sys
+import json
 import tempfile
 
 
@@ -151,6 +152,73 @@ def get_model_cache_dir():
     path = os.path.join(get_user_data_dir(), 'models')
     os.makedirs(path, exist_ok=True)
     return path
+
+
+def get_model_config_path():
+    """
+    获取模型配置文件路径
+
+    返回值：
+        str: model_config.json 文件的绝对路径
+    """
+    return os.path.join(get_user_data_dir(), 'model_config.json')
+
+
+def load_model_config():
+    """
+    读取模型配置，返回当前选择的模型名
+
+    返回值：
+        str: 选中的模型名称，默认为 "emotion2vec_plus_large"
+    """
+    config_path = get_model_config_path()
+    try:
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            model_name = config.get('selected_model', 'emotion2vec_plus_large')
+            # 验证模型名合法性
+            valid_models = ['emotion2vec_plus_seed', 'emotion2vec_plus_base', 'emotion2vec_plus_large']
+            if model_name in valid_models:
+                return model_name
+    except (json.JSONDecodeError, IOError, OSError):
+        pass
+    return 'emotion2vec_plus_large'
+
+
+def save_model_config(model_name):
+    """
+    保存模型配置
+
+    参数：
+        model_name (str): 模型名称
+
+    返回值：
+        bool: True 表示保存成功
+    """
+    config_path = get_model_config_path()
+    try:
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump({'selected_model': model_name}, f, ensure_ascii=False, indent=2)
+        return True
+    except (IOError, OSError):
+        return False
+
+
+def is_model_downloaded(model_name):
+    """
+    检查指定模型是否已下载
+
+    参数：
+        model_name (str): 模型名称（如 emotion2vec_plus_large）
+
+    返回值：
+        bool: True 表示模型已下载（model.pt 文件存在）
+    """
+    model_cache_dir = get_model_cache_dir()
+    model_pt = os.path.join(model_cache_dir, 'models', 'iic', model_name, 'model.pt')
+    return os.path.exists(model_pt)
 
 
 def get_log_file():
