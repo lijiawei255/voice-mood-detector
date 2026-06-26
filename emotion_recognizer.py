@@ -430,13 +430,10 @@ class EmotionRecognizer:
                     disable_pbar=True,       # 禁用进度条
                     disable_log=True,        # 禁用详细日志
                     # 优先使用 GPU，没有则使用 CPU
-                    device="cuda:0" if torch.cuda.is_available() else "cpu"
+                    device="cpu"  # 强制使用CPU推理，确保所有电脑均可运行
                 )
 
-                if torch.cuda.is_available():
-                    self._report_progress("检测到GPU，启用CUDA加速...")
-                else:
-                    self._report_progress("使用CPU进行推理...")
+                self._report_progress("使用CPU进行推理...")
 
                 self._report_progress(f"模型 [{model_display}] 加载完成！")
                 self.loaded = True
@@ -699,8 +696,13 @@ class EmotionRecognizer:
         根据当前情绪概率分布，识别是否存在复合情绪模式。
         复合情绪要求所有组成情绪的概率都超过一定阈值。
 
+        心理学依据：
+        - 复合情绪由多种基础情绪组合而成（如焦虑=恐惧+悲伤）
+        - 各组成情绪需同时达到一定强度才能判定为复合情绪
+        - "其他"情绪不参与复合情绪判断（非基础情绪类别）
+
         参数：
-            probs_dict (dict): 各情绪的概率字典
+            probs_dict (dict): 各情绪的概率字典（包含所有8种情绪）
             main_emotion (str): 主要情绪类型
 
         返回值：
@@ -716,6 +718,9 @@ class EmotionRecognizer:
         # 复合情绪检测阈值：组成情绪概率需超过此值
         COMPOUND_THRESHOLD = 0.10
 
+        # 不参与复合情绪判断的情绪类别
+        EXCLUDED_EMOTIONS = {"其他"}
+
         best_match = None
         best_score = 0.0
 
@@ -725,6 +730,10 @@ class EmotionRecognizer:
             all_present = True
             component_score = 0.0
             for comp_emotion in components:
+                # 跳过被排除的情绪类别
+                if comp_emotion in EXCLUDED_EMOTIONS:
+                    all_present = False
+                    break
                 prob = float(probs_dict.get(comp_emotion, 0.0))
                 if prob < COMPOUND_THRESHOLD:
                     all_present = False

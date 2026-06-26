@@ -57,16 +57,23 @@ class HistoryManager:
 
     MAX_RECORDS = 200           # 最大记录数
     MIN_RECORDS_TO_KEEP = 50    # 最少保留记录数
+    AUTO_CLEAN_THRESHOLD = 50   # 自动清理触发阈值
+    AUTO_CLEAN_COUNT = 10       # 每次自动清理的记录数
 
-    def __init__(self):
+    def __init__(self, cleanup_callback=None):
         """
         初始化历史记录管理器
 
         初始化时会自动从磁盘加载已有的历史记录。
         如果历史文件不存在或损坏，会初始化为空记录。
+
+        参数：
+            cleanup_callback (callable, 可选): 自动清理前的回调函数，
+                签名为 callback(count)，用于通知 GUI 显示提醒
         """
         self.history_path = get_history_path()
         self.records = []
+        self.cleanup_callback = cleanup_callback
         self._ensure_directory()
         self.load()
 
@@ -184,6 +191,20 @@ class HistoryManager:
                 return False
 
             self.records.append(record)
+
+            # 达到自动清理阈值时，通知并删除最早的记录
+            if len(self.records) >= self.AUTO_CLEAN_THRESHOLD:
+                if self.cleanup_callback:
+                    try:
+                        self.cleanup_callback(self.AUTO_CLEAN_COUNT)
+                    except Exception:
+                        pass
+                # 删除最早的 AUTO_CLEAN_COUNT 条记录
+                to_delete = self.records[:self.AUTO_CLEAN_COUNT]
+                for old_rec in to_delete:
+                    self._delete_audio_file(old_rec.get("audio_file", ""))
+                self.records = self.records[self.AUTO_CLEAN_COUNT:]
+                logger.info(f"自动清理: 删除最早的 {self.AUTO_CLEAN_COUNT} 条历史记录")
 
             # 超过最大记录数时，清理最旧的记录
             if len(self.records) > self.MAX_RECORDS:
