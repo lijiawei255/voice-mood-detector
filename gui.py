@@ -1427,7 +1427,7 @@ class MainWindow(QMainWindow):
         guide_layout.addWidget(features_title)
 
         features_text = QLabel(
-            "<div style='line-height: 1.9; font-size: 10pt; color: #2B2B2B;'>"
+            "<div style='line-height: 1.9; font-size: 11pt; color: #2B2B2B;'>"
             "\u25aa <b>多模型支持：</b>可切换 Large/Base/Seed 三种模型<br>"
             "\u25aa <b>7种情绪识别：</b>平静、开心、惊讶、悲伤、愤怒、恐惧、厌恶<br>"
             "\u25aa <b>复合情绪检测：</b>自动识别焦虑、挫败等复合情绪<br>"
@@ -1443,7 +1443,7 @@ class MainWindow(QMainWindow):
 
         # 提示
         tip_label = QLabel(
-            "<div style='background: #F2EDE4; padding: 10px 12px; margin-top: 6px; font-size: 10pt; color: #2B2B2B; border: 2px solid #2B2B2B;'>"
+            "<div style='background: #F2EDE4; padding: 10px 12px; margin-top: 6px; font-size: 11pt; color: #2B2B2B; border: 2px solid #2B2B2B;'>"
             "<b>小贴士：</b>在安静的环境下录音，效果会更好"
             "</div>"
         )
@@ -1853,7 +1853,7 @@ class MainWindow(QMainWindow):
             background-color: #E8E3DA;
             text-align: center;
             font-weight: bold;
-            font-size: 10pt;
+            font-size: 11pt;
             font-family: "Microsoft YaHei", "SimHei", "Arial Black";
         }
 
