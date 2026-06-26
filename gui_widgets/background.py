@@ -76,10 +76,10 @@ class ConstructivistBackground(QWidget):
         p.setBrush(QColor("#2B2B2B"))
         p.drawRect(w - 2, h // 5, 2, h * 2 // 3)
 
-        # 大幅面斜穿红色半透明条（构成主义标志性斜向动势） — 提高不透明度
-        p.setBrush(QColor(196, 75, 79, 90))  # #C44B4F 约35%透明度 — 更明显
+        # 大幅面斜穿红色半透明条（构成主义标志性斜向动势）
+        p.setBrush(QColor(196, 75, 79, 100))  # ~40%透明度
         p.setPen(Qt.NoPen)
-        stripe_width = 120
+        stripe_width = 140
         diag_stripe = QPolygon([
             QPoint(w, h // 5),
             QPoint(w, h // 5 + stripe_width),
@@ -87,15 +87,25 @@ class ConstructivistBackground(QWidget):
             QPoint(w * 3 // 5, h // 5 + w * 2 // 5)
         ])
         p.drawPolygon(diag_stripe)
-        # 第二道斜向条（反向，炭黑色，更宽）
-        p.setBrush(QColor(43, 43, 43, 60))
+        # 第二道斜向条（反向，炭黑色）
+        p.setBrush(QColor(43, 43, 43, 70))
         stripe2 = QPolygon([
             QPoint(0, h * 5 // 8),
-            QPoint(0, h * 5 // 8 + 80),
-            QPoint(w * 2 // 5, h * 5 // 8 - w * 2 // 5 + 80),
+            QPoint(0, h * 5 // 8 + 90),
+            QPoint(w * 2 // 5, h * 5 // 8 - w * 2 // 5 + 90),
             QPoint(w * 2 // 5, h * 5 // 8 - w * 2 // 5)
         ])
         p.drawPolygon(stripe2)
+        # 第三条：粗实线对角线（砖红色，8px — 高度可见）
+        pen3 = QPen(QColor('#C44B4F'))
+        pen3.setWidth(5)
+        p.setPen(pen3)
+        p.drawLine(w * 7 // 8, 0, w * 1 // 8, h)
+        # 第四条：细黑线对角线（交叉，4px）
+        pen4 = QPen(QColor('#2B2B2B'))
+        pen4.setWidth(3)
+        p.setPen(pen4)
+        p.drawLine(w * 6 // 8, 0, w * 2 // 8, h)
 
         p.end()
         self._cache = pixmap

@@ -37,7 +37,7 @@ from PyQt5.QtWidgets import (
     QTabWidget, QGroupBox, QPushButton, QLabel, QProgressBar, QTextEdit,
     QListWidget, QSplitter, QFrame, QSizePolicy, QMessageBox, QFileDialog,
     QMenuBar, QMenu, QAction, QGridLayout, QScrollArea, QDialog, QComboBox,
-    QRadioButton, QButtonGroup, QGraphicsDropShadowEffect
+    QRadioButton, QButtonGroup
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize, QObject, QUrl, QPropertyAnimation, QEasingCurve, QRect
 from PyQt5.QtGui import QFont, QPalette, QColor, QDesktopServices, QPainter, QBrush, QPen, QPainterPath
@@ -312,7 +312,7 @@ class WelcomeDialog(QDialog):
                     background-color: #C44B4F;
                     color: white;
                     border: 2px solid #2B2B2B;
-                    border-radius: 2px;
+                    border-radius: 0px;
                     padding: 12px 30px;
                     font-weight: bold;
                 }
@@ -335,7 +335,7 @@ class WelcomeDialog(QDialog):
                     background-color: #2B2B2B;
                     color: white;
                     border: 2px solid #2B2B2B;
-                    border-radius: 2px;
+                    border-radius: 0px;
                     padding: 10px 30px;
                     font-weight: bold;
                 }
@@ -458,7 +458,7 @@ class ModelSwitchDialog(QDialog):
                 background-color: #E8E3DA;
                 color: #2B2B2B;
                 border: 2px solid #2B2B2B;
-                border-radius: 2px;
+                border-radius: 0px;
                 padding: 8px 20px;
                 font-weight: bold;
             }
@@ -479,7 +479,7 @@ class ModelSwitchDialog(QDialog):
                 background-color: #C44B4F;
                 color: white;
                 border: 2px solid #2B2B2B;
-                border-radius: 2px;
+                border-radius: 0px;
                 padding: 8px 20px;
                 font-weight: bold;
             }
@@ -968,8 +968,8 @@ class MainWindow(QMainWindow):
         sep.setStyleSheet("background-color: #2B2B2B;")
         header_layout.addWidget(sep)
 
-        title_label = QLabel("语音情绪识别系统")
-        title_label.setFont(QFont("Microsoft YaHei", 28, QFont.Black))
+        title_label = QLabel("■ 语音情绪识别系统")
+        title_label.setFont(QFont("Microsoft YaHei", 30, QFont.Black))
         title_label.setObjectName("headerTitle")
         header_layout.addWidget(title_label)
         header_layout.addStretch()
@@ -983,7 +983,7 @@ class MainWindow(QMainWindow):
                 background-color: #F2EDE4;
                 color: #2B2B2B;
                 border: 2px solid #2B2B2B;
-                border-radius: 2px;
+                border-radius: 0px;
                 padding: 6px 16px;
                 font-weight: bold;
             }
@@ -1299,6 +1299,7 @@ class MainWindow(QMainWindow):
         quick_guide.setStyleSheet("""
             QGroupBox#guideGroup {
                 border: 3px solid #2B2B2B;
+                border-left: 8px solid #C44B4F;
                 border-radius: 0px;
                 margin-top: 14px;
                 padding-top: 22px;
@@ -1312,6 +1313,7 @@ class MainWindow(QMainWindow):
                 padding: 0 14px;
                 color: #C44B4F;
                 font-weight: 900;
+                background-color: #F2EDE4;
             }
         """)
         guide_layout = QVBoxLayout(quick_guide)
@@ -1387,7 +1389,7 @@ class MainWindow(QMainWindow):
         content_splitter.setSizes([840, 360])
 
         layout.addWidget(content_splitter)
-        self.tab_widget.addTab(realtime_widget, "实时检测")
+        self.tab_widget.addTab(realtime_widget, "▸ 实时检测")
 
     @exception_safe()
     def create_history_tab(self):
@@ -1465,7 +1467,7 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(1, 2)
 
         layout.addWidget(splitter)
-        self.tab_widget.addTab(history_widget, "历史报告")
+        self.tab_widget.addTab(history_widget, "▸ 历史报告")
 
     @exception_safe()
     def create_bottom_buttons(self, parent_layout):
@@ -1475,17 +1477,18 @@ class MainWindow(QMainWindow):
         # 构成主义底部操作条：红色底板（象征"行动带"）+ 粗黑边框
         btn_frame = QFrame()
         btn_frame.setObjectName("bottomBtnFrame")
-        btn_frame.setMinimumHeight(60)
+        btn_frame.setMinimumHeight(42)
         btn_frame.setStyleSheet("""
             QFrame#bottomBtnFrame {
                 background-color: #C44B4F;
                 border: 3px solid #2B2B2B;
+                border-right: 8px solid #2B2B2B;
                 border-radius: 0px;
             }
         """)
         btn_layout = QHBoxLayout(btn_frame)
         btn_layout.setSpacing(15)
-        btn_layout.setContentsMargins(20, 8, 20, 8)
+        btn_layout.setContentsMargins(20, 5, 20, 5)
 
         data_btn = QPushButton("数据管理")
         data_btn.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
@@ -1614,12 +1617,12 @@ class MainWindow(QMainWindow):
 
         QTabBar::tab {
             background-color: #E8E3DA;
-            padding: 13px 32px;
-            margin-right: 4px;
+            padding: 14px 36px;
+            margin-right: 6px;
             border-top-left-radius: 0px;
             border-top-right-radius: 0px;
-            font-weight: bold;
-            font-size: 13px;
+            font-weight: 900;
+            font-size: 14px;
             font-family: "Microsoft YaHei", "SimHei", "Arial Black";
             color: #2B2B2B;
             border: 3px solid #2B2B2B;
@@ -1628,8 +1631,8 @@ class MainWindow(QMainWindow):
 
         QTabBar::tab:selected {
             background-color: #F2EDE4;
-            border-bottom: 3px solid #C44B4F;
-            color: #2B2B2B;
+            border-bottom: 4px solid #C44B4F;
+            color: #C44B4F;
         }
 
         QTabBar::tab:hover:!selected {
@@ -1660,7 +1663,7 @@ class MainWindow(QMainWindow):
             background-color: #8A8580;
             color: white;
             border: 3px solid #2B2B2B;
-            border-radius: 2px;
+            border-radius: 0px;
             padding: 20px;
             font-family: "Microsoft YaHei", "SimHei", "Arial Black";
             font-weight: bold;
@@ -1737,6 +1740,8 @@ class MainWindow(QMainWindow):
             border-radius: 0px;
             padding: 12px 20px;
             border: 3px solid #2B2B2B;
+            background-color: #F2EDE4;
+            font-weight: 900;
         }
 
         QProgressBar {
@@ -1801,7 +1806,7 @@ class MainWindow(QMainWindow):
             background-color: #C44B4F;
             color: white;
             border: 3px solid #2B2B2B;
-            border-radius: 2px;
+            border-radius: 0px;
             padding: 8px 20px;
             font-weight: bold;
         }
