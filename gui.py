@@ -1316,10 +1316,10 @@ class MainWindow(QMainWindow):
             bar_row.setSpacing(12)
 
             label = QLabel(emotion)
-            label.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
-            label.setMinimumWidth(50)
-            label.setMaximumWidth(50)
-            label.setStyleSheet("color: #2B2B2B;")
+            label.setFont(QFont("Microsoft YaHei", 11, QFont.Black))
+            label.setMinimumWidth(55)
+            label.setMaximumWidth(55)
+            label.setStyleSheet("color: #2B2B2B; font-weight: 900;")
             bar_row.addWidget(label)
 
             bar = QProgressBar()
@@ -1327,13 +1327,8 @@ class MainWindow(QMainWindow):
             bar.setValue(0)
             bar.setTextVisible(False)
             bar.setObjectName(f"probBar_{emotion}")
-            # 构成主义：交替高度打破规整
-            bh = 40 if idx % 2 == 0 else 30
-            bar.setMinimumHeight(bh)
-            bar.setMaximumHeight(bh)
-            # 交替宽度打破对称
-            bw = 180 if idx % 3 == 0 else 100 + idx * 8
-            bar.setMinimumWidth(bw)
+            bar.setMinimumHeight(32)
+            bar.setMaximumHeight(32)
             bar.setProperty("barColor", color)
             self.prob_bars[emotion] = bar
             bar_row.addWidget(bar, 1)
@@ -1401,13 +1396,13 @@ class MainWindow(QMainWindow):
             "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 0px; border-left: 6px solid #C44B4F;'>"
             "<b style='color: #FFF; background: #C44B4F; padding: 2px 8px; font-size: 13pt;'>1</b>　→ 等待模型加载完成"
             "</div>"
-            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 24px; border-left: 6px solid #2B2B2B;'>"
+            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 12px; border-left: 6px solid #2B2B2B;'>"
             "<b style='color: #FFF; background: #8A8580; padding: 2px 8px; font-size: 13pt;'>2</b>　→ 点击「开始录音」按钮"
             "</div>"
-            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 48px; border-left: 6px solid #C44B4F;'>"
+            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 24px; border-left: 6px solid #C44B4F;'>"
             "<b style='color: #FFF; background: #C44B4F; padding: 2px 8px; font-size: 13pt;'>3</b>　→ 说出您的感受（3-30秒）"
             "</div>"
-            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 24px; border-left: 6px solid #2B2B2B;'>"
+            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 12px; border-left: 6px solid #2B2B2B;'>"
             "<b style='color: #FFF; background: #8A8580; padding: 2px 8px; font-size: 13pt;'>4</b>　→ 点击「停止录音」按钮"
             "</div>"
             "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 0px; border-left: 6px solid #C44B4F;'>"
