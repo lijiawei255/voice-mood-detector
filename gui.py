@@ -1577,7 +1577,7 @@ class MainWindow(QMainWindow):
     @exception_safe()
     def create_bottom_buttons(self, parent_layout):
         bottom_container = QVBoxLayout()
-        bottom_container.setSpacing(8)
+        bottom_container.setSpacing(10)
 
         # 构成主义底部操作条：红色底板（象征"行动带"）+ 粗黑边框
         btn_frame = QFrame()
@@ -1952,6 +1952,7 @@ class MainWindow(QMainWindow):
 
         QPushButton {
             outline: none;
+            border-radius: 0px;
             font-family: "Microsoft YaHei", "SimHei", "Arial Black";
             font-weight: bold;
         }
