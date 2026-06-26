@@ -1325,7 +1325,7 @@ class MainWindow(QMainWindow):
 
             bar = QProgressBar()
             bar.setRange(0, 100)
-            bar.setValue(0)
+            bar.setValue(5)  # 默认5% — 可见几何占位符
             bar.setTextVisible(False)
             bar.setObjectName(f"probBar_{emotion}")
             bar.setMinimumHeight(32)
@@ -1334,7 +1334,7 @@ class MainWindow(QMainWindow):
             self.prob_bars[emotion] = bar
             bar_row.addWidget(bar, 1)
 
-            pct_label = QLabel("0%")
+            pct_label = QLabel("—")
             pct_label.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
             pct_label.setMinimumWidth(55)
             pct_label.setMaximumWidth(55)
@@ -1625,11 +1625,10 @@ class MainWindow(QMainWindow):
 
         current_model = load_model_config()
         self.credit_label = QLabel(
-            f"Powered by {current_model} (ModelScope/达摩院, Apache-2.0) | "
-            "便携模式 - 数据保存在程序目录 | 仅供个人非商用参考使用"
+            f"■ {current_model}  |  ModelScope/达摩院 Apache-2.0  |  便携模式  |  仅供个人参考"
         )
         self.credit_label.setAlignment(Qt.AlignCenter)
-        self.credit_label.setFont(QFont("Microsoft YaHei", 8, QFont.Bold))
+        self.credit_label.setFont(QFont("Microsoft YaHei", 9, QFont.Black))
         self.credit_label.setObjectName("creditLabel")
         self.credit_label.setWordWrap(True)
         bottom_container.addWidget(self.credit_label)
@@ -1946,9 +1945,9 @@ class MainWindow(QMainWindow):
         }
 
         #creditLabel {
-            color: #8A8580;
+            color: #2B2B2B;
             padding: 5px;
-            font-weight: bold;
+            font-weight: 900;
         }
 
         QPushButton {
