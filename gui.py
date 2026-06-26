@@ -284,7 +284,7 @@ class WelcomeDialog(QDialog):
         disclaimer_layout = QVBoxLayout(disclaimer_group)
         disclaimer_layout.setContentsMargins(20, 25, 20, 20)
         disclaimer_text = QLabel(
-            "<div style='line-height: 1.8; font-size: 11pt; color: #c0392b;'>"
+            "<div style='line-height: 1.8; font-size: 11pt; color: #C44B4F;'>"
             "<p><b>本软件仅供个人非商用参考使用！</b></p>"
             "<p>检测结果仅作为情绪状态的辅助参考，<b>不构成任何医疗诊断或建议</b>。</p>"
             "<p>如果您感到持续的情绪低落、焦虑或其他心理困扰，"
@@ -317,10 +317,10 @@ class WelcomeDialog(QDialog):
                     font-weight: bold;
                 }
                 QPushButton:hover {
-                    background-color: #A33B3F;
+                    background-color: #2B2B2B;
                 }
                 QPushButton:pressed {
-                    background-color: #8A2E31;
+                    background-color: #2B2B2B;
                 }
             """)
             start_btn.clicked.connect(self._on_start_clicked)
@@ -484,7 +484,7 @@ class ModelSwitchDialog(QDialog):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #A33B3F;
+                background-color: #2B2B2B;
             }
         """)
         self.confirm_btn.clicked.connect(self._on_confirm)
@@ -1563,7 +1563,7 @@ class MainWindow(QMainWindow):
             )
             plot_placeholder.setAlignment(Qt.AlignCenter)
             plot_placeholder.setFont(QFont("Microsoft YaHei", 12))
-            plot_placeholder.setStyleSheet("color: #8C8680; padding: 40px;")
+            plot_placeholder.setStyleSheet("color: #8A8580; padding: 40px;")
             plot_layout.addWidget(plot_placeholder)
 
         splitter.addWidget(plot_group)
@@ -1777,11 +1777,11 @@ class MainWindow(QMainWindow):
         }
 
         #recordBtn:enabled:hover {
-            background-color: #A33B3F;
+            background-color: #2B2B2B;
         }
 
         #recordBtn:enabled:pressed {
-            background-color: #8B2F32;
+            background-color: #2B2B2B;
         }
 
         #recordBtn[isRecording="true"] {
@@ -1789,7 +1789,7 @@ class MainWindow(QMainWindow):
         }
 
         #recordBtn[isRecording="true"]:hover {
-            background-color: #1A1A1A;
+            background-color: #2B2B2B;
         }
 
         #durationLabel {
@@ -1915,7 +1915,7 @@ class MainWindow(QMainWindow):
         }
 
         #dangerBtn:hover {
-            background-color: #A33B3F;
+            background-color: #2B2B2B;
         }
 
         QScrollArea {
@@ -2336,7 +2336,7 @@ class MainWindow(QMainWindow):
 
                 self.score_card.set_value(f"{score:.1f}", color, "分")
                 self.level_card.set_value(level, color)
-                self.emotion_card.set_value(main_emotion, "#3498db", f"置信度 {confidence:.1%}")
+                self.emotion_card.set_value(main_emotion, "#C44B4F", f"置信度 {confidence:.1%}")
 
                 # P0 新增：更新集成化评估报告卡片
                 self.result_card_widget.update_result(result)
