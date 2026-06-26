@@ -1625,10 +1625,10 @@ class MainWindow(QMainWindow):
 
         current_model = load_model_config()
         self.credit_label = QLabel(
-            f"■ {current_model}  |  ModelScope/达摩院 Apache-2.0  |  便携模式  |  仅供个人参考"
+            f"■ {current_model}  |  Apache-2.0  |  仅供个人参考"
         )
         self.credit_label.setAlignment(Qt.AlignCenter)
-        self.credit_label.setFont(QFont("Microsoft YaHei", 9, QFont.Black))
+        self.credit_label.setFont(QFont("Microsoft YaHei", 9, QFont.Bold))
         self.credit_label.setObjectName("creditLabel")
         self.credit_label.setWordWrap(True)
         bottom_container.addWidget(self.credit_label)
@@ -1946,8 +1946,8 @@ class MainWindow(QMainWindow):
 
         #creditLabel {
             color: #2B2B2B;
-            padding: 5px;
-            font-weight: 900;
+            padding: 4px;
+            font-weight: bold;
         }
 
         QPushButton {
