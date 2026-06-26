@@ -1325,7 +1325,7 @@ class MainWindow(QMainWindow):
 
             bar = QProgressBar()
             bar.setRange(0, 100)
-            bar.setValue(5)  # 默认5% — 可见几何占位符
+            bar.setValue(8)  # 默认8% — 清晰可见的红色几何条
             bar.setTextVisible(False)
             bar.setObjectName(f"probBar_{emotion}")
             bar.setMinimumHeight(32)
