@@ -899,9 +899,9 @@ class MainWindow(QMainWindow):
         self.model_switch_btn.setEnabled(True)
         if success:
             self._append_log_safe("情绪识别模型加载完成，准备就绪！")
-            self.status_label.setText("● 准备就绪")
+            self.status_label.setText("■ 准备就绪")
             self.status_label.setStyleSheet("color: #FFFFFF; background-color: #2B2B2B; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
-            self.record_btn.setText("● 点击开始录音")
+            self.record_btn.setText("■ 点击开始录音")
             self.record_btn.setProperty("isRecording", "false")
             self.record_btn.style().unpolish(self.record_btn)
             self.record_btn.style().polish(self.record_btn)
@@ -911,7 +911,7 @@ class MainWindow(QMainWindow):
             error_msg = f"模型加载失败: {error}"
             self._append_log_safe(f"{error_msg}")
             logger.error(error_msg)
-            self.status_label.setText("● 模型加载失败")
+            self.status_label.setText("■ 模型加载失败")
             self.status_label.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
             QMessageBox.warning(
                 self, "模型加载提示",
@@ -1021,7 +1021,7 @@ class MainWindow(QMainWindow):
         self.model_switch_btn.clicked.connect(self.show_model_switch_dialog)
         header_layout.addWidget(self.model_switch_btn)
 
-        self.status_label = QLabel("● 正在启动...")
+        self.status_label = QLabel("■ 正在启动...")
         self.status_label.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
         self.status_label.setObjectName("statusLoading")
         self.status_label.setStyleSheet("color: #FFFFFF; background-color: #8A8580; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
@@ -1174,7 +1174,7 @@ class MainWindow(QMainWindow):
         control_layout.setSpacing(12)
         control_layout.setContentsMargins(20, 25, 20, 20)
 
-        self.record_btn = QPushButton("● 模型加载中...")
+        self.record_btn = QPushButton("■ 模型加载中...")
         self.record_btn.setFont(QFont("Microsoft YaHei", 22, QFont.Black))
         self.record_btn.setMinimumHeight(130)
         self.record_btn.setObjectName("recordBtn")
@@ -1197,6 +1197,10 @@ class MainWindow(QMainWindow):
         self.duration_display.setMinimumWidth(120)
         self.duration_display.setAlignment(Qt.AlignCenter)
         self.duration_display.setObjectName("durationLabel")
+        self.duration_display.setStyleSheet(
+            "color: #2B2B2B; background: #F2EDE4; "
+            "border: 3px solid #2B2B2B; border-left: 8px solid #C44B4F; "
+            "font-weight: bold;")
         info_grid.addWidget(self.duration_display, 0, 1)
 
         # P0 新增：录音质量实时反馈
@@ -1208,7 +1212,8 @@ class MainWindow(QMainWindow):
         self.quality_feedback.setAlignment(Qt.AlignCenter)
         self.quality_feedback.setMinimumHeight(28)
         self.quality_feedback.setStyleSheet(
-            "background-color: #F2EDE4; border: 2px solid #2B2B2B; "
+            "background-color: #E8E3DA; border: 3px solid #2B2B2B; "
+            "border-left: 8px solid #2B2B2B; "
             "padding: 4px; color: #2B2B2B; font-weight: bold;"
         )
         info_grid.addWidget(self.quality_feedback, 1, 1)
@@ -1388,21 +1393,26 @@ class MainWindow(QMainWindow):
         guide_layout.addWidget(steps_title)
 
         steps_text = QLabel(
-            "<div style='line-height: 2.4; font-size: 10.5pt; color: #2B2B2B;'>"
-            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 0px; border-left: 6px solid #C44B4F;'>"
-            "<b style='color: #FFF; background: #C44B4F; padding: 2px 8px; font-size: 13pt;'>1</b>　→ 等待模型加载完成"
+            "<div style='line-height: 2.2; font-size: 10.5pt; color: #2B2B2B;'>"
+            "<div style='background: #F2EDE4; padding: 8px 14px; margin: 3px 0; "
+            "border-left: 8px solid #C44B4F;'>"
+            "<b style='color: #C44B4F; font-size: 14pt;'>■</b> 等待模型加载完成"
             "</div>"
-            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 12px; border-left: 6px solid #2B2B2B;'>"
-            "<b style='color: #FFF; background: #8A8580; padding: 2px 8px; font-size: 13pt;'>2</b>　→ 点击「开始录音」按钮"
+            "<div style='background: #E8E3DA; padding: 8px 14px; margin: 3px 0; "
+            "border-left: 8px solid #2B2B2B;'>"
+            "<b style='color: #2B2B2B; font-size: 14pt;'>■</b> 点击「开始录音」按钮"
             "</div>"
-            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 24px; border-left: 6px solid #C44B4F;'>"
-            "<b style='color: #FFF; background: #C44B4F; padding: 2px 8px; font-size: 13pt;'>3</b>　→ 说出您的感受（3-30秒）"
+            "<div style='background: #F2EDE4; padding: 8px 14px; margin: 3px 0; "
+            "border-left: 8px solid #C44B4F;'>"
+            "<b style='color: #C44B4F; font-size: 14pt;'>■</b> 说出您的感受（3-30秒）"
             "</div>"
-            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 12px; border-left: 6px solid #2B2B2B;'>"
-            "<b style='color: #FFF; background: #8A8580; padding: 2px 8px; font-size: 13pt;'>4</b>　→ 点击「停止录音」按钮"
+            "<div style='background: #E8E3DA; padding: 8px 14px; margin: 3px 0; "
+            "border-left: 8px solid #2B2B2B;'>"
+            "<b style='color: #2B2B2B; font-size: 14pt;'>■</b> 点击「停止录音」按钮"
             "</div>"
-            "<div style='background: #F2EDE4; padding: 6px 10px; margin: 3px 0 3px 0px; border-left: 6px solid #C44B4F;'>"
-            "<b style='color: #FFF; background: #C44B4F; padding: 2px 8px; font-size: 13pt;'>5</b>　→ 查看情绪分析结果"
+            "<div style='background: #F2EDE4; padding: 8px 14px; margin: 3px 0; "
+            "border-left: 8px solid #C44B4F;'>"
+            "<b style='color: #C44B4F; font-size: 14pt;'>■</b> 查看情绪分析结果"
             "</div>"
             "</div>"
         )
@@ -1584,7 +1594,7 @@ class MainWindow(QMainWindow):
         btn_layout.setSpacing(15)
         btn_layout.setContentsMargins(20, 5, 20, 5)
 
-        data_btn = QPushButton("数据管理")
+        data_btn = QPushButton("■ 数据管理")
         data_btn.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         data_btn.setMinimumHeight(48)
         data_btn.setMinimumWidth(150)
@@ -2004,7 +2014,7 @@ class MainWindow(QMainWindow):
     def _reset_recording_ui(self):
         self.is_recording = False
         self.is_analyzing = False
-        self.record_btn.setText("● 点击开始录音")
+        self.record_btn.setText("■ 点击开始录音")
         self.record_btn.setProperty("isRecording", "false")
         self.record_btn.style().unpolish(self.record_btn)
         self.record_btn.style().polish(self.record_btn)
@@ -2189,7 +2199,7 @@ class MainWindow(QMainWindow):
     @exception_safe()
     def on_recording_finished(self, output_path):
         self.is_recording = False
-        self.record_btn.setText("● 点击开始录音")
+        self.record_btn.setText("■ 点击开始录音")
         self.record_btn.setProperty("isRecording", "false")
         self.record_btn.style().unpolish(self.record_btn)
         self.record_btn.style().polish(self.record_btn)
@@ -2212,7 +2222,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "提示", "录音时长过短，请重新录制（至少1秒）")
                 self.append_log("录音时长过短，已取消分析")
                 self._reset_recording_ui()
-                self.status_label.setText("● 准备就绪")
+                self.status_label.setText("■ 准备就绪")
                 self.status_label.setStyleSheet("color: #FFFFFF; background-color: #2B2B2B; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
                 return
 
@@ -2272,7 +2282,7 @@ class MainWindow(QMainWindow):
         self._reset_recording_ui()
         self.append_log(f"分析异常: {error_msg}")
         logger.error(f"分析异常: {error_msg}")
-        self.status_label.setText("● 分析失败")
+        self.status_label.setText("■ 分析失败")
         self.status_label.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
         QMessageBox.critical(self, "分析错误", f"情绪分析过程发生错误:\n{error_msg}")
 
@@ -2401,7 +2411,7 @@ class MainWindow(QMainWindow):
                             padding: 12px 20px;
                             font-weight: bold;
                         """)
-                        self.status_label.setText("● 情绪不稳定")
+                        self.status_label.setText("■ 情绪不稳定")
                         self.status_label.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
                     else:
                         self.warning_label.setText("情绪存在一定波动，建议适当休息放松")
@@ -2413,11 +2423,11 @@ class MainWindow(QMainWindow):
                             padding: 12px 20px;
                             font-weight: bold;
                         """)
-                        self.status_label.setText("● 情绪波动")
+                        self.status_label.setText("■ 情绪波动")
                         self.status_label.setStyleSheet("color: #FFFFFF; background-color: #8A8580; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
                 else:
                     self.warning_label.hide()
-                    self.status_label.setText("● 情绪状态良好")
+                    self.status_label.setText("■ 情绪状态良好")
                     self.status_label.setStyleSheet("color: #FFFFFF; background-color: #2B2B2B; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
 
                 self.append_log(f"分析完成 - 稳定度分数: {score:.1f}/10, 情绪状态: {level}, 主要情绪: {main_emotion}" + (f", 复合情绪: {compound_emotion}" if compound_emotion else ""))
@@ -2427,13 +2437,13 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "分析错误", f"情绪分析失败:\n{error_msg}")
                 self.append_log(f"分析错误: {error_msg}")
                 logger.error(f"分析失败: {error_msg}")
-                self.status_label.setText("● 分析失败")
+                self.status_label.setText("■ 分析失败")
                 self.status_label.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
         except Exception as e:
             logger.error(f"处理分析结果异常: {str(e)}", exc_info=True)
             self.append_log(f"处理分析结果异常: {str(e)}")
             QMessageBox.critical(self, "错误", f"处理分析结果失败:\n{str(e)}")
-            self.status_label.setText("● 处理错误")
+            self.status_label.setText("■ 处理错误")
             self.status_label.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;")
 
     @exception_safe()
