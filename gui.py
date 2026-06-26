@@ -801,9 +801,9 @@ class DiagonalStripe(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing, False)
         w, h = self.width(), self.height()
-        # 单条贯穿对角线：砖红色，4px实线
-        pen = QPen(QColor(196, 75, 79, 90))
-        pen.setWidth(4)
+        # 单条贯穿对角线：砖红色，5px，提高不透明度补偿背景绘制
+        pen = QPen(QColor(196, 75, 79, 120))
+        pen.setWidth(5)
         pen.setCapStyle(Qt.FlatCap)
         p.setPen(pen)
         p.drawLine(0, 0, w, h)
@@ -967,10 +967,10 @@ class MainWindow(QMainWindow):
         self._bg_widget.setGeometry(central_widget.rect())
         self._bg_widget.lower()
 
-        # 构成主义对角线覆盖层 — 前景绘制，贯穿所有控件
+        # 构成主义对角线覆盖层 — 背景绘制，避免切割交互元素
         self._diag_stripe = DiagonalStripe(central_widget)
         self._diag_stripe.setGeometry(central_widget.rect())
-        self._diag_stripe.raise_()
+        self._diag_stripe.lower()
 
         main_layout = QVBoxLayout(central_widget)
         main_layout.setSpacing(10)
