@@ -38,7 +38,7 @@ class DimensionBar(QWidget):
     """
 
     def __init__(self, label, value, range_min, range_max,
-                 low_color="#C44B4F", high_color="#27AE60", parent=None):
+                 low_color="#C44B4F", high_color="#C44B4F", parent=None):
         """
         参数：
             label (str): 维度名称
@@ -287,7 +287,7 @@ class ResultCardWidget(QFrame):
 
         score = result.get('情绪稳定度分数', 0.0)
         level = result.get('情绪状态等级', '未知')
-        color = result.get('等级颜色', '#95A5A6')
+        color = result.get('等级颜色', '#8A8580')
         main_emotion = result.get('主要情绪', '未知')
         confidence = result.get('置信度', 0.0)
 
@@ -341,11 +341,11 @@ class ResultCardWidget(QFrame):
         # 可靠性标签
         reliability = result.get('assessment_reliability', '')
         if reliability:
-            rel_colors = {"高": "#27AE60", "中": "#F1C40F", "低": "#E74C3C"}
-            rel_color = rel_colors.get(reliability, "#95A5A6")
+            rel_colors = {"高": "#C44B4F", "中": "#8A8580", "低": "#C44B4F"}
+            rel_color = rel_colors.get(reliability, "#8A8580")
             self.reliability_label.setText(f"可靠性: {reliability}")
             self.reliability_label.setStyleSheet(
-                f"color: {rel_color}; font-weight: bold; background: #F7F5F2; "
+                f"color: {rel_color}; font-weight: bold; background: #F2EDE4; "
                 f"border: 2px solid {rel_color}; padding: 4px 16px;"
             )
             self.reliability_label.show()

@@ -141,14 +141,14 @@ class ExportToolbar(QWidget):
         csv_btn.setMinimumHeight(32)
         csv_btn.setStyleSheet("""
             QPushButton {
-                background-color: #F7F5F2;
+                background-color: #F2EDE4;
                 border: 2px solid #2B2B2B;
                 padding: 4px 16px;
                 color: #2B2B2B;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #E8E4DF;
+                background-color: #E8E3DA;
             }
         """)
         csv_btn.clicked.connect(self.export_csv_clicked.emit)
@@ -159,14 +159,14 @@ class ExportToolbar(QWidget):
         json_btn.setMinimumHeight(32)
         json_btn.setStyleSheet("""
             QPushButton {
-                background-color: #F7F5F2;
+                background-color: #F2EDE4;
                 border: 2px solid #2B2B2B;
                 padding: 4px 16px;
                 color: #2B2B2B;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #E8E4DF;
+                background-color: #E8E3DA;
             }
         """)
         json_btn.clicked.connect(self.export_json_clicked.emit)

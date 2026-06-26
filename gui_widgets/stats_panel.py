@@ -20,7 +20,7 @@ class StatsPanel(QGroupBox):
     """统计分析面板"""
 
     def __init__(self, parent=None):
-        super().__init__("统计分析", parent)
+        super().__init__("■ 统计分析", parent)
         self.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         self.setObjectName("statsGroup")
         self.setStyleSheet("""
@@ -28,7 +28,7 @@ class StatsPanel(QGroupBox):
                 border: 3px solid #2B2B2B;
                 margin-top: 12px;
                 padding-top: 20px;
-                background-color: #F7F5F2;
+                background-color: #F2EDE4;
             }
             QGroupBox#statsGroup::title {
                 subcontrol-origin: margin;

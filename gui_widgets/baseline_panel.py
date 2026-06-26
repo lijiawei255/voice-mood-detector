@@ -31,7 +31,7 @@ class BaselinePanel(QGroupBox):
                 border: 3px solid #2B2B2B;
                 margin-top: 12px;
                 padding-top: 20px;
-                background-color: #F7F5F2;
+                background-color: #F2EDE4;
             }
             QGroupBox#baselineGroup::title {
                 subcontrol-origin: margin;
@@ -49,7 +49,7 @@ class BaselinePanel(QGroupBox):
         # 状态指示
         self.status_label = QLabel("基线状态：未建立")
         self.status_label.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
-        self.status_label.setStyleSheet("color: #E67E22;")
+        self.status_label.setStyleSheet("color: #8A8580;")
         layout.addWidget(self.status_label)
 
         self.info_label = QLabel(
@@ -71,7 +71,7 @@ class BaselinePanel(QGroupBox):
         self.baseline_progress.setStyleSheet("""
             QProgressBar {
                 border: 2px solid #2B2B2B;
-                background-color: #E8E4DF;
+                background-color: #E8E3DA;
                 text-align: center;
                 font-weight: bold;
             }
@@ -123,7 +123,7 @@ class BaselinePanel(QGroupBox):
         """根据基线管理器的状态更新 UI"""
         if baseline_manager is None:
             self.status_label.setText("基线状态：不可用")
-            self.status_label.setStyleSheet("color: #95A5A6;")
+            self.status_label.setStyleSheet("color: #8A8580;")
             self.baseline_progress.setValue(0)
             self.reset_btn.setEnabled(False)
             return
@@ -137,12 +137,12 @@ class BaselinePanel(QGroupBox):
             bl = baseline_manager.get_baseline()
             n_total = bl.get("n_samples", n) if bl else n
             self.status_label.setText(f"基线状态：已建立（{n_total} 个样本）")
-            self.status_label.setStyleSheet("color: #27AE60;")
+            self.status_label.setStyleSheet("color: #C44B4F;")
             self.reset_btn.setEnabled(True)
             self.collect_btn.setText("追加基线样本")
         else:
             self.status_label.setText(f"基线状态：采集中（{n}/3）")
-            self.status_label.setStyleSheet("color: #E67E22;")
+            self.status_label.setStyleSheet("color: #8A8580;")
             self.reset_btn.setEnabled(n > 0)
             self.collect_btn.setText("采集基线样本")
 
@@ -161,16 +161,16 @@ class BaselinePanel(QGroupBox):
 def _btn_style():
     return """
         QPushButton {
-            background-color: #F7F5F2;
+            background-color: #F2EDE4;
             border: 2px solid #2B2B2B;
             padding: 4px 16px;
             color: #2B2B2B;
         }
         QPushButton:hover {
-            background-color: #E8E4DF;
+            background-color: #E8E3DA;
         }
         QPushButton:disabled {
-            color: #C4C0BC;
-            border-color: #C4C0BC;
+            color: #8A8580;
+            border-color: #8A8580;
         }
     """

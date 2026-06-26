@@ -2305,7 +2305,7 @@ class MainWindow(QMainWindow):
             if result.get('success', False):
                 score = result.get('情绪稳定度分数', 0.0)
                 level = result.get('情绪状态等级', '未知')
-                color = result.get('等级颜色', '#95A5A6')
+                color = result.get('等级颜色', '#8A8580')
                 probs = result.get('所有情绪概率', {})
                 main_emotion = result.get('主要情绪', '未知')
                 confidence = result.get('置信度', 0.0)
@@ -2356,9 +2356,9 @@ class MainWindow(QMainWindow):
                 compound_emotion = result.get('复合情绪', '')
                 compound_detail = result.get('复合情绪详情', None)
                 if compound_emotion:
-                    self.compound_card.set_value(compound_emotion, "#9B59B6", compound_detail.get('desc', '')[:20] if compound_detail else "")
+                    self.compound_card.set_value(compound_emotion, "#C44B4F", compound_detail.get('desc', '')[:20] if compound_detail else "")
                 else:
-                    self.compound_card.set_value("未检测到", "#95A5A6", "情绪状态较单一")
+                    self.compound_card.set_value("未检测到", "#8A8580", "情绪状态较单一")
 
                 from emotion_recognizer import STABILITY_LEVELS
                 border_color = color
