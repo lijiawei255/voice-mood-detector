@@ -8,83 +8,74 @@
 - 可靠性徽章（综合可靠性 + 双模型一致性）
 - 基线偏移卡片（相对个人基线的偏移）
 
-设计风格：苏联构成主义（粗炭黑边框、直角、三角装饰、砖红点缀）
+设计风格：极简主义（瑞士/包豪斯）— 细线边框、浅灰底、蓝色强调、无装饰
 
 作者：Jiawei Li
 许可证：GPL v3
 """
 
 from PyQt5.QtWidgets import (
-    QFrame, QVBoxLayout, QHBoxLayout, QLabel, QGridLayout, QSizePolicy, QWidget
+    QFrame, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy, QWidget
 )
-from PyQt5.QtCore import Qt, QPoint
-from PyQt5.QtGui import QFont, QColor, QPainter, QPen, QPolygon
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
+
+from .fonts import UI_FONT, MONO_FONT
 
 
-class _ConstructivistCard(QFrame):
-    """构成主义风格卡片基类"""
+# 极简主义色板常量
+_BG_SECONDARY = "#F5F5F7"
+_TEXT_PRIMARY = "#1D1D1F"
+_TEXT_SECONDARY = "#86868B"
+_ACCENT = "#1A73E8"
+_BORDER = "#D2D2D7"
+_SUCCESS = "#34A853"
+_WARNING = "#F9AB00"
+_ERROR = "#EA4335"
+
+
+class _MinimalCard(QFrame):
+    """极简主义风格卡片基类 — 浅灰背景 + 细线边框 + 圆角，无装饰绘制"""
 
     def __init__(self, title, parent=None):
         super().__init__(parent)
-        self.setObjectName("constructivistCard")
+        self.setObjectName("minimalCard")
         self._title = title
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.setStyleSheet("""
-            QFrame#constructivistCard {
-                background-color: #F2EDE4;
-                border: 3px solid #2B2B2B;
-                border-radius: 0px;
-            }
+        self.setStyleSheet(f"""
+            QFrame#minimalCard {{
+                background-color: {_BG_SECONDARY};
+                border: 1px solid {_BORDER};
+                border-radius: 8px;
+            }}
         """)
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing, False)
-        # 粗黑边框
-        pen = QPen(QColor("#2B2B2B"))
-        pen.setWidth(3)
-        painter.setPen(pen)
-        painter.setBrush(Qt.NoBrush)
-        painter.drawRect(1, 1, self.width() - 3, self.height() - 3)
-        # 左上角红色楔形
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor("#C44B4F"))
-        wedge = QPolygon([QPoint(0, 0), QPoint(22, 0), QPoint(0, 22)])
-        painter.drawPolygon(wedge)
-        # 右下角黑色小三角
-        painter.setBrush(QColor("#2B2B2B"))
-        w, h = self.width(), self.height()
-        tri = QPolygon([QPoint(w, h), QPoint(w - 12, h), QPoint(w, h - 12)])
-        painter.drawPolygon(tri)
-        painter.end()
-        super().paintEvent(event)
 
 
 class MetricRow(QWidget):
-    """一行指标：标签 + 数值 + 可选单位"""
+    """一行指标：标签 + 数值 + 可选单位（极简风格）"""
 
     def __init__(self, label, value="--", unit="", parent=None):
         super().__init__(parent)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 2, 0, 2)
+        layout.setContentsMargins(0, 3, 0, 3)
         layout.setSpacing(8)
 
         self.label_lbl = QLabel(label)
-        self.label_lbl.setFont(QFont("Microsoft YaHei", 10))
-        self.label_lbl.setStyleSheet("color: #8A8580;")
+        self.label_lbl.setFont(QFont(UI_FONT, 11))
+        self.label_lbl.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         layout.addWidget(self.label_lbl)
 
         layout.addStretch()
 
         self.value_lbl = QLabel(value)
-        self.value_lbl.setFont(QFont("Consolas", 11, QFont.Bold))
-        self.value_lbl.setStyleSheet("color: #2B2B2B;")
+        self.value_lbl.setFont(QFont(MONO_FONT, 12, QFont.Bold))
+        self.value_lbl.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(self.value_lbl)
 
         if unit:
             self.unit_lbl = QLabel(unit)
-            self.unit_lbl.setFont(QFont("Microsoft YaHei", 9))
-            self.unit_lbl.setStyleSheet("color: #8A8580;")
+            self.unit_lbl.setFont(QFont(UI_FONT, 10))
+            self.unit_lbl.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
             layout.addWidget(self.unit_lbl)
         else:
             self.unit_lbl = None
@@ -93,7 +84,7 @@ class MetricRow(QWidget):
         self.value_lbl.setText(str(text))
 
 
-class AcousticFeatureCard(_ConstructivistCard):
+class AcousticFeatureCard(_MinimalCard):
     """声学特征卡片"""
 
     def __init__(self, parent=None):
@@ -103,12 +94,12 @@ class AcousticFeatureCard(_ConstructivistCard):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 18, 16, 16)
+        layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
 
-        title = QLabel("▸ 声学特征")
-        title.setFont(QFont("Microsoft YaHei", 12, QFont.Black))
-        title.setStyleSheet("color: #C44B4F; font-weight: 900;")
+        title = QLabel("声学特征")
+        title.setFont(QFont(UI_FONT, 13, QFont.Medium))
+        title.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(title)
 
         self.f0_row = MetricRow("平均音高 F0", "--", "Hz")
@@ -123,9 +114,9 @@ class AcousticFeatureCard(_ConstructivistCard):
                     self.shimmer_row, self.hnr_row, self.rate_row, self.silence_row]:
             layout.addWidget(row)
 
-        note = QLabel("⚠ 声带特征需要安装 praat-parselmouth 以获得专业级精度")
-        note.setFont(QFont("Microsoft YaHei", 9))
-        note.setStyleSheet("color: #8A8580;")
+        note = QLabel("声带音质指标（Jitter / Shimmer / HNR）默认由 praat-parselmouth（Praat 算法，临床语音分析金标准）提取；未安装时将自动降级为 librosa 近似，精度较低。")
+        note.setFont(QFont(UI_FONT, 10))
+        note.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         note.setWordWrap(True)
         layout.addWidget(note)
 
@@ -143,7 +134,7 @@ class AcousticFeatureCard(_ConstructivistCard):
         self.show()
 
 
-class PsychologicalIndicatorCard(_ConstructivistCard):
+class PsychologicalIndicatorCard(_MinimalCard):
     """心理状态指标卡片"""
 
     def __init__(self, parent=None):
@@ -153,12 +144,12 @@ class PsychologicalIndicatorCard(_ConstructivistCard):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 18, 16, 16)
+        layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
 
-        title = QLabel("▸ 心理状态指标")
-        title.setFont(QFont("Microsoft YaHei", 12, QFont.Black))
-        title.setStyleSheet("color: #C44B4F; font-weight: 900;")
+        title = QLabel("心理状态指标")
+        title.setFont(QFont(UI_FONT, 13, QFont.Medium))
+        title.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(title)
 
         self.stress_row = MetricRow("压力指数", "--")
@@ -171,9 +162,9 @@ class PsychologicalIndicatorCard(_ConstructivistCard):
                     self.activation_row, self.speech_stability_row]:
             layout.addWidget(row)
 
-        note = QLabel("⚠ 基于声学特征与 VAD 维度的估计值，非临床诊断")
-        note.setFont(QFont("Microsoft YaHei", 9))
-        note.setStyleSheet("color: #8A8580;")
+        note = QLabel("基于声学特征与 VAD 维度的估计值，非临床诊断")
+        note.setFont(QFont(UI_FONT, 10))
+        note.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         note.setWordWrap(True)
         layout.addWidget(note)
 
@@ -189,7 +180,7 @@ class PsychologicalIndicatorCard(_ConstructivistCard):
         self.show()
 
 
-class ReliabilityBadge(_ConstructivistCard):
+class ReliabilityBadge(_MinimalCard):
     """可靠性徽章卡片"""
 
     def __init__(self, parent=None):
@@ -199,25 +190,26 @@ class ReliabilityBadge(_ConstructivistCard):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 18, 16, 16)
+        layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
 
-        title = QLabel("▸ 可靠性评估")
-        title.setFont(QFont("Microsoft YaHei", 12, QFont.Black))
-        title.setStyleSheet("color: #C44B4F; font-weight: 900;")
+        title = QLabel("可靠性评估")
+        title.setFont(QFont(UI_FONT, 13, QFont.Medium))
+        title.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(title)
 
         self.level_lbl = QLabel("--")
-        self.level_lbl.setFont(QFont("Consolas", 24, QFont.Bold))
+        self.level_lbl.setFont(QFont(MONO_FONT, 28, QFont.Bold))
         self.level_lbl.setAlignment(Qt.AlignCenter)
         self.level_lbl.setMinimumHeight(40)
+        self.level_lbl.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(self.level_lbl)
 
         self.detail_lbl = QLabel("")
-        self.detail_lbl.setFont(QFont("Microsoft YaHei", 10))
+        self.detail_lbl.setFont(QFont(UI_FONT, 11))
         self.detail_lbl.setAlignment(Qt.AlignCenter)
         self.detail_lbl.setWordWrap(True)
-        self.detail_lbl.setStyleSheet("color: #8A8580;")
+        self.detail_lbl.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         layout.addWidget(self.detail_lbl)
 
     def update_reliability(self, result):
@@ -226,11 +218,11 @@ class ReliabilityBadge(_ConstructivistCard):
             self.hide()
             return
 
-        # 高→炭黑（正面强调）、中→暖灰、低→砖红（警示），三者可区分
-        colors = {"高": "#2B2B2B", "中": "#8A8580", "低": "#C44B4F"}
-        color = colors.get(reliability, "#8A8580")
+        # 极简色彩编码：高=绿、中=灰、低=红
+        colors = {"高": _SUCCESS, "中": _TEXT_SECONDARY, "低": _ERROR}
+        color = colors.get(reliability, _TEXT_SECONDARY)
         self.level_lbl.setText(f"{reliability}")
-        self.level_lbl.setStyleSheet(f"color: {color}; font-weight: bold;")
+        self.level_lbl.setStyleSheet(f"color: {color}; font-weight: bold; background: transparent;")
 
         details = []
         if result.get('is_dual_model') or result.get('is_research_session'):
@@ -242,11 +234,11 @@ class ReliabilityBadge(_ConstructivistCard):
         if result.get('consistency') is not None:
             details.append(f"多次采样一致性: {result['consistency']:.2f}")
 
-        self.detail_lbl.setText(" | ".join(details) if details else "基于音频质量与模型置信度")
+        self.detail_lbl.setText("  ·  ".join(details) if details else "基于音频质量与模型置信度")
         self.show()
 
 
-class BaselineDeviationCard(_ConstructivistCard):
+class BaselineDeviationCard(_MinimalCard):
     """基线偏移卡片"""
 
     def __init__(self, parent=None):
@@ -256,30 +248,30 @@ class BaselineDeviationCard(_ConstructivistCard):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 18, 16, 16)
+        layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
 
-        title = QLabel("▸ 相对个人基线")
-        title.setFont(QFont("Microsoft YaHei", 12, QFont.Black))
-        title.setStyleSheet("color: #C44B4F; font-weight: 900;")
+        title = QLabel("相对个人基线")
+        title.setFont(QFont(UI_FONT, 13, QFont.Medium))
+        title.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(title)
 
         self.status_lbl = QLabel("基线尚未建立")
-        self.status_lbl.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
+        self.status_lbl.setFont(QFont(UI_FONT, 12))
         self.status_lbl.setAlignment(Qt.AlignCenter)
-        self.status_lbl.setStyleSheet("color: #8A8580;")
+        self.status_lbl.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         layout.addWidget(self.status_lbl)
 
         self.summary_lbl = QLabel("")
-        self.summary_lbl.setFont(QFont("Microsoft YaHei", 10))
+        self.summary_lbl.setFont(QFont(UI_FONT, 11))
         self.summary_lbl.setWordWrap(True)
-        self.summary_lbl.setStyleSheet("color: #2B2B2B;")
+        self.summary_lbl.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(self.summary_lbl)
 
     def update_deviation(self, deviation):
         if not deviation or not deviation.get('available'):
             self.status_lbl.setText("基线尚未建立")
-            self.status_lbl.setStyleSheet("color: #8A8580;")
+            self.status_lbl.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
             self.summary_lbl.setText("建议在「基线校准」面板采集 3-5 条平静语音")
             self.show()
             return
@@ -287,6 +279,6 @@ class BaselineDeviationCard(_ConstructivistCard):
         level = deviation.get('personalized_stability_level', '与基线一致')
         score = deviation.get('personalized_stability_score', 0.0)
         self.status_lbl.setText(f"{level}（评分 {score:.1f}）")
-        self.status_lbl.setStyleSheet("color: #C44B4F; font-weight: bold;")
+        self.status_lbl.setStyleSheet(f"color: {_ACCENT}; font-weight: bold; background: transparent;")
         self.summary_lbl.setText(deviation.get('summary', ''))
         self.show()

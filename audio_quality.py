@@ -35,15 +35,20 @@ import wave
 logger = logging.getLogger(__name__)
 
 # 音频质量门控阈值
+# 说明：这些阈值用于「质量门控」提示，对真实麦克风录音保持宽容。
+# 噪声/语音比/音量类问题只作为 warning（不阻断科研流程），仅时长/爆音
+# 才作为 fatal（必须重新录制）。
 AUDIO_QUALITY_THRESHOLDS = {
-    "min_duration": 1.0,           # 最小时长（秒）
-    "max_duration": 60.0,          # 最大时长（秒）
-    "min_speech_ratio": 0.4,       # 最小有效语音比例
-    "max_clipping_ratio": 0.05,    # 最大爆音比例
-    "max_noise_level": 0.3,        # 最大噪声水平
-    "min_rms": 0.005,              # 最小RMS音量
-    "research_min_duration": 3.0,  # 科研模式最小时长
-    "research_max_duration": 30.0, # 科研模式最大时长
+    "min_duration": 1.0,           # 最小时长（秒）— fatal
+    "max_duration": 60.0,          # 最大时长（秒）— fatal
+    "min_speech_ratio": 0.25,      # 最小有效语音比例 — warning（真实说话有停顿）
+    "max_clipping_ratio": 0.05,    # 最大爆音比例 — fatal
+    "max_noise_level": 0.6,        # 最大噪声水平 — warning（对真实底噪宽容）
+    "min_rms": 0.003,              # 最小RMS音量 — warning
+    # 科研模式最小时长对齐 UI 建议（RESEARCH_MIN_DURATION=10 秒）：过短会导致
+    # 声学特征（jitter/shimmer/HNR）估计不稳定。仅 fatal 才阻断流程。
+    "research_min_duration": 10.0,  # 科研模式最小时长（秒）— fatal
+    "research_max_duration": 30.0, # 科研模式最大时长（秒）— fatal
 }
 
 
@@ -313,8 +318,8 @@ def compute_audio_quality(filepath):
         speech_duration = sum(end - start for start, end in segments)
         speech_ratio = speech_duration / duration if duration > 0 else 0.0
 
-        # 噪声水平估计（非语音段的平均能量）
-        if speech_ratio > 0.1 and speech_ratio < 0.9:
+        # 噪声水平估计（非语音段的平均能量，相对总体能量）
+        if 0.1 <= speech_ratio <= 0.9:
             speech_mask = np.zeros(len(audio), dtype=bool)
             for start, end in segments:
                 speech_mask[int(start * sr):int(end * sr)] = True
@@ -323,8 +328,14 @@ def compute_audio_quality(filepath):
                 noise_rms = float(np.sqrt(np.mean(non_speech ** 2) + 1e-10))
             else:
                 noise_rms = 0.0
+        elif speech_ratio > 0.9:
+            # 绝大多数是语音：无法可靠估计底噪，记为很低的噪声
+            noise_rms = 0.0
         else:
-            noise_rms = 0.0 if speech_ratio > 0.9 else float(rms)
+            # 语音占比 < 10%：VAD 很可能因低音量/底噪而漏检，噪声估计
+            # 不可靠。取一个中等保守值（约为总体能量的一半），避免历史
+            # bug 中 noise_rms=rms 导致 noise_level 恒为 1.0 而被误拒。
+            noise_rms = 0.5 * float(rms)
 
         noise_level = noise_rms / max(rms, 1e-8)
         noise_level = min(1.0, noise_level)
@@ -333,7 +344,10 @@ def compute_audio_quality(filepath):
         speech_score = min(1.0, speech_ratio / 0.6)
         clip_score = max(0.0, 1.0 - clipping_ratio / AUDIO_QUALITY_THRESHOLDS["max_clipping_ratio"])
         noise_score = max(0.0, 1.0 - noise_level / AUDIO_QUALITY_THRESHOLDS["max_noise_level"])
-        rms_ideal = 0.1
+        # rms_score 的理想值须与 normalize_volume 的 target_rms(0.15) 一致，
+        # 否则归一化后的音频 rms_score 会被系统性低估（曾因 0.1 vs 0.15 不匹配
+        # 导致 quality_score 偏低，进而拉低可靠性评级）。
+        rms_ideal = 0.15
         rms_score = max(0.0, 1.0 - abs(rms - rms_ideal) / rms_ideal)
 
         quality_score = (
@@ -416,8 +430,11 @@ class AudioQualityAnalyzer:
             if quality is None:
                 return None
 
-            # 识别质量问题
-            issues = []
+            # 识别质量问题。区分 fatal（必须重新录制）与 warning（提示但放行）：
+            #   - 时长过短/过长、爆音 → fatal
+            #   - 噪声较高、语音比例低、音量过低 → warning（对真实麦克风录音宽容）
+            issues = []          # fatal 问题，非空则质量门控不通过
+            warnings = []        # 警告问题，不阻断流程
             recommendations = []
 
             thresholds = AUDIO_QUALITY_THRESHOLDS
@@ -425,19 +442,20 @@ class AudioQualityAnalyzer:
                 issues.append("录音时长过短")
                 recommendations.append(f"建议录音至少 {thresholds['min_duration']} 秒")
             if quality["speech_ratio"] < thresholds["min_speech_ratio"]:
-                issues.append("有效语音比例过低")
+                warnings.append("有效语音比例偏低")
                 recommendations.append("请靠近麦克风并清晰地说话")
             if quality["clipping_ratio"] > thresholds["max_clipping_ratio"]:
                 issues.append("检测到爆音")
                 recommendations.append("请适当远离麦克风或降低音量")
             if quality["noise_level"] > thresholds["max_noise_level"]:
-                issues.append("环境噪声较高")
+                warnings.append("环境噪声较高")
                 recommendations.append("建议在安静的环境中录音")
             if quality["rms_mean"] < thresholds["min_rms"]:
-                issues.append("音量过低")
+                warnings.append("音量过低")
                 recommendations.append("请靠近麦克风或提高说话音量")
 
             quality["issues"] = issues
+            quality["warnings"] = warnings
             quality["recommendations"] = recommendations
             quality["original_duration"] = round(original_duration, 2)
 

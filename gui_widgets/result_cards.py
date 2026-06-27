@@ -9,20 +9,32 @@
 - 音频质量反馈指示
 - 可靠性标签
 
-设计风格：苏联构成主义（粗炭黑边框、直角、三角装饰、砖红点缀）
+设计风格：极简主义（瑞士/包豪斯）— 细线边框、浅灰底、蓝色强调、无装饰
 
 作者：Jiawei Li
 许可证：GPL v3
 """
 
 from PyQt5.QtWidgets import (
-    QFrame, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar,
-    QSizePolicy, QWidget, QGridLayout
+    QFrame, QVBoxLayout, QHBoxLayout, QLabel,
+    QSizePolicy, QWidget
 )
-from PyQt5.QtCore import Qt, QRect, QPoint
-from PyQt5.QtGui import (
-    QFont, QColor, QPainter, QPen, QBrush, QPolygon, QPainterPath
-)
+from PyQt5.QtCore import Qt, QRect
+from PyQt5.QtGui import QFont, QColor, QPainter, QBrush, QFontMetrics
+
+from .fonts import UI_FONT, MONO_FONT
+
+
+# 极简主义色板常量（与 gui.py 主样式保持一致）
+_BG_SECONDARY = "#F5F5F7"
+_BG_TERTIARY = "#EBEBEF"
+_TEXT_PRIMARY = "#1D1D1F"
+_TEXT_SECONDARY = "#86868B"
+_ACCENT = "#1A73E8"
+_BORDER = "#D2D2D7"
+_SUCCESS = "#34A853"
+_WARNING = "#F9AB00"
+_ERROR = "#EA4335"
 
 
 class DimensionBar(QWidget):
@@ -32,12 +44,11 @@ class DimensionBar(QWidget):
     用于可视化展示效价(Valence)、唤醒度(Arousal)、掌控感(Dominance)三个维度。
     每个维度显示为一个水平条形指示器，左侧标签 + 彩色条 + 数值。
 
-    采用苏联构成主义 5 色调色板（炭黑 #2B2B2B / 砖红 #C44B4F / 暖灰 #8A8580），
-    各维度通过 low_color/high_color 在调色板内取色，不使用额外色相。
+    极简主义风格：细圆角条、中性背景、蓝色强调。
     """
 
     def __init__(self, label, value, range_min, range_max,
-                 low_color="#C44B4F", high_color="#C44B4F", parent=None):
+                 low_color=_ACCENT, high_color=_ACCENT, parent=None):
         """
         参数：
             label (str): 维度名称
@@ -54,10 +65,18 @@ class DimensionBar(QWidget):
         self._range_max = range_max
         self._low_color = QColor(low_color)
         self._high_color = QColor(high_color)
+        # 用于绘制文本的字体（与 paintEvent 保持一致）
+        self._label_font = QFont(UI_FONT, 11)
+        self._value_font = QFont(MONO_FONT, 11, QFont.Bold)
+        # 根据字体度量动态计算标签与数值列宽，保证不截断
+        fm_label = QFontMetrics(self._label_font)
+        fm_value = QFontMetrics(self._value_font)
+        self._label_w = max(72, fm_label.width(self._label) + 12)
+        self._value_w = max(60, fm_value.width("-0.00") + 12)
         self.setMinimumHeight(32)
         self.setMaximumHeight(40)
-        # 保证标签(70) + 条形最小宽度 + 数值(55) 不致 bar_w 变为负值
-        self.setMinimumWidth(150)
+        # 保证标签 + 条形最小宽度 + 数值 不致 bar_w 变为负值
+        self.setMinimumWidth(self._label_w + self._value_w + 40)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     def paintEvent(self, event):
@@ -68,19 +87,19 @@ class DimensionBar(QWidget):
         h = self.height()
 
         # 标签
-        painter.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
-        painter.setPen(QColor("#2B2B2B"))
-        label_rect = QRect(0, 0, 70, h)
+        painter.setFont(self._label_font)
+        painter.setPen(QColor(_TEXT_SECONDARY))
+        label_rect = QRect(0, 0, self._label_w, h)
         painter.drawText(label_rect, Qt.AlignLeft | Qt.AlignVCenter, self._label)
 
-        # 条形背景
-        bar_x = 72
-        bar_w = max(0, w - bar_x - 60)
-        bar_h = 14
+        # 条形背景（圆角）
+        bar_x = self._label_w + 6
+        bar_w = max(0, w - bar_x - self._value_w - 4)
+        bar_h = 8
         bar_y = (h - bar_h) // 2
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor("#E8E3DA"))
-        painter.drawRect(bar_x, bar_y, bar_w, bar_h)
+        painter.setBrush(QColor(_BG_TERTIARY))
+        painter.drawRoundedRect(bar_x, bar_y, bar_w, bar_h, 4, 4)
 
         # 计算填充比例（居中于零点或从最小值开始）
         if self._range_min < 0:
@@ -96,8 +115,8 @@ class DimensionBar(QWidget):
                 fill_x = zero_pos - fill_w
                 fill_color = self._low_color
             # 画零点标记线
-            painter.setPen(QPen(QColor("#2B2B2B"), 1))
-            painter.drawLine(zero_pos, bar_y - 2, zero_pos, bar_y + bar_h + 2)
+            painter.setPen(QColor(_TEXT_SECONDARY))
+            painter.drawLine(zero_pos, bar_y - 3, zero_pos, bar_y + bar_h + 3)
             painter.setPen(Qt.NoPen)
         else:
             # 单端条形（如唤醒度，0~1）
@@ -113,13 +132,13 @@ class DimensionBar(QWidget):
             )
 
         painter.setBrush(QBrush(fill_color))
-        painter.drawRect(fill_x, bar_y, fill_w, bar_h)
+        painter.drawRoundedRect(fill_x, bar_y, fill_w, bar_h, 4, 4)
 
         # 数值文本
-        painter.setPen(QColor("#2B2B2B"))
-        painter.setFont(QFont("Consolas", 10, QFont.Bold))
+        painter.setPen(QColor(_TEXT_PRIMARY))
+        painter.setFont(self._value_font)
         val_str = f"{self._value:+.2f}" if self._range_min < 0 else f"{self._value:.2f}"
-        val_rect = QRect(bar_x + bar_w + 4, 0, 55, h)
+        val_rect = QRect(bar_x + bar_w + 6, 0, self._value_w, h)
         painter.drawText(val_rect, Qt.AlignLeft | Qt.AlignVCenter, val_str)
 
         painter.end()
@@ -136,7 +155,7 @@ class ResultCardWidget(QFrame):
     - 音频质量反馈
     - 可靠性标签
 
-    设计风格：苏联构成主义（与现有 ScoreCard 一致）
+    设计风格：极简主义
     """
 
     def __init__(self, parent=None):
@@ -160,13 +179,13 @@ class ResultCardWidget(QFrame):
         self.emotion_frame = self._make_sub_card("主要情绪")
         emotion_layout = QVBoxLayout(self.emotion_frame)
         self.emotion_value = QLabel("--")
-        self.emotion_value.setFont(QFont("Consolas", 32, QFont.Bold))
+        self.emotion_value.setFont(QFont(MONO_FONT, 36, QFont.Bold))
         self.emotion_value.setAlignment(Qt.AlignCenter)
-        self.emotion_value.setStyleSheet("color: #2B2B2B;")
+        self.emotion_value.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         self.emotion_confidence = QLabel("")
-        self.emotion_confidence.setFont(QFont("Microsoft YaHei", 10))
+        self.emotion_confidence.setFont(QFont(UI_FONT, 11))
         self.emotion_confidence.setAlignment(Qt.AlignCenter)
-        self.emotion_confidence.setStyleSheet("color: #8A8580;")
+        self.emotion_confidence.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         emotion_layout.addWidget(self.emotion_value)
         emotion_layout.addWidget(self.emotion_confidence)
         top_row.addWidget(self.emotion_frame, 1)
@@ -175,11 +194,13 @@ class ResultCardWidget(QFrame):
         self.stability_frame = self._make_sub_card("情绪稳定度 (0-10)")
         stability_layout = QVBoxLayout(self.stability_frame)
         self.stability_value = QLabel("--")
-        self.stability_value.setFont(QFont("Consolas", 32, QFont.Bold))
+        self.stability_value.setFont(QFont(MONO_FONT, 36, QFont.Bold))
         self.stability_value.setAlignment(Qt.AlignCenter)
+        self.stability_value.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         self.stability_level = QLabel("")
-        self.stability_level.setFont(QFont("Microsoft YaHei", 10))
+        self.stability_level.setFont(QFont(UI_FONT, 11))
         self.stability_level.setAlignment(Qt.AlignCenter)
+        self.stability_level.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         stability_layout.addWidget(self.stability_value)
         stability_layout.addWidget(self.stability_level)
         top_row.addWidget(self.stability_frame, 1)
@@ -187,17 +208,17 @@ class ResultCardWidget(QFrame):
         layout.addLayout(top_row)
 
         # --- 第二行：VAD 维度 ---
-        vad_label = QLabel("情感维度指标（⚠️ 从离散概率估计）")
-        vad_label.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
-        vad_label.setStyleSheet("color: #8A8580;")
+        vad_label = QLabel("情感维度指标（从离散概率估计）")
+        vad_label.setFont(QFont(UI_FONT, 11))
+        vad_label.setStyleSheet(f"color: {_TEXT_SECONDARY};")
         layout.addWidget(vad_label)
 
-        self.valence_bar = DimensionBar("▸ 效价", 0.0, -1.0, 1.0,
-                                        low_color="#2B2B2B", high_color="#C44B4F")
-        self.arousal_bar = DimensionBar("▸ 唤醒度", 0.0, 0.0, 1.0,
-                                        low_color="#8A8580", high_color="#C44B4F")
-        self.dominance_bar = DimensionBar("▸ 掌控感", 0.0, 0.0, 1.0,
-                                          low_color="#8A8580", high_color="#2B2B2B")
+        self.valence_bar = DimensionBar("效价", 0.0, -1.0, 1.0,
+                                        low_color=_ACCENT, high_color=_ACCENT)
+        self.arousal_bar = DimensionBar("唤醒度", 0.0, 0.0, 1.0,
+                                        low_color=_TEXT_SECONDARY, high_color=_ACCENT)
+        self.dominance_bar = DimensionBar("掌控感", 0.0, 0.0, 1.0,
+                                          low_color=_TEXT_SECONDARY, high_color=_ACCENT)
 
         layout.addWidget(self.valence_bar)
         layout.addWidget(self.arousal_bar)
@@ -205,8 +226,8 @@ class ResultCardWidget(QFrame):
 
         # --- 第三行：稳定度分项 ---
         factors_label = QLabel("稳定度因子分解（权重来源：专家设定）")
-        factors_label.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
-        factors_label.setStyleSheet("color: #8A8580;")
+        factors_label.setFont(QFont(UI_FONT, 11))
+        factors_label.setStyleSheet(f"color: {_TEXT_SECONDARY};")
         layout.addWidget(factors_label)
 
         factors_row = QHBoxLayout()
@@ -214,19 +235,19 @@ class ResultCardWidget(QFrame):
         for name, key in [("负面加权", "negative"), ("熵分散度", "entropy"), ("极端度", "extremity")]:
             fframe = self._make_sub_card(name)
             flay = QVBoxLayout(fframe)
-            flay.setContentsMargins(6, 6, 6, 6)
+            flay.setContentsMargins(8, 8, 8, 8)
             flay.setSpacing(4)
             # 因子名称标签
             name_lbl = QLabel(name)
-            name_lbl.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
+            name_lbl.setFont(QFont(UI_FONT, 11))
             name_lbl.setAlignment(Qt.AlignCenter)
-            name_lbl.setStyleSheet("color: #8A8580; font-weight: bold;")
+            name_lbl.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
             flay.addWidget(name_lbl)
             # 因子数值
             val = QLabel("--")
-            val.setFont(QFont("Consolas", 16, QFont.Bold))
+            val.setFont(QFont(MONO_FONT, 18, QFont.Bold))
             val.setAlignment(Qt.AlignCenter)
-            val.setStyleSheet("color: #2B2B2B;")
+            val.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
             flay.addWidget(val)
             setattr(self, f"factor_{key}_value", val)
             # 添加tooltip说明
@@ -241,54 +262,32 @@ class ResultCardWidget(QFrame):
 
         # --- 音频质量标签 ---
         self.quality_label = QLabel("")
-        self.quality_label.setFont(QFont("Microsoft YaHei", 9))
-        self.quality_label.setStyleSheet("color: #8A8580; padding: 2px 0;")
+        self.quality_label.setFont(QFont(UI_FONT, 10))
+        self.quality_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; padding: 2px 0;")
         self.quality_label.hide()
         layout.addWidget(self.quality_label)
 
         # --- 可靠性标签 ---
         self.reliability_label = QLabel("")
-        self.reliability_label.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
+        self.reliability_label.setFont(QFont(UI_FONT, 11))
         self.reliability_label.setAlignment(Qt.AlignCenter)
-        self.reliability_label.setMinimumHeight(28)
+        self.reliability_label.setMinimumHeight(32)
         self.reliability_label.hide()
         layout.addWidget(self.reliability_label)
 
     def _make_sub_card(self, title):
-        """创建一个子卡片框架"""
+        """创建一个子卡片框架（极简风格：浅灰背景 + 细线边框 + 圆角）"""
         frame = QFrame()
         frame.setObjectName("subCard")
         frame.setFrameStyle(QFrame.NoFrame)
-        frame.setStyleSheet("""
-            QFrame#subCard {
-                background-color: #F2EDE4;
-                border: 2px solid #2B2B2B;
-            }
+        frame.setStyleSheet(f"""
+            QFrame#subCard {{
+                background-color: {_BG_SECONDARY};
+                border: 1px solid {_BORDER};
+                border-radius: 4px;
+            }}
         """)
         return frame
-
-    def paintEvent(self, event):
-        """构成主义风格边框 + 大型红色楔形装饰"""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing, False)
-        # 炭黑粗边框
-        pen = QPen(QColor("#2B2B2B"))
-        pen.setWidth(3)
-        painter.setPen(pen)
-        painter.setBrush(Qt.NoBrush)
-        painter.drawRect(1, 1, self.width() - 3, self.height() - 3)
-        # 左上角大型红色楔形（构成主义标志 — 指向右下）
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor("#C44B4F"))
-        wedge = QPolygon([QPoint(0, 0), QPoint(30, 0), QPoint(0, 30)])
-        painter.drawPolygon(wedge)
-        # 右下角炭黑小三角（呼应）
-        painter.setBrush(QColor("#2B2B2B"))
-        w, h = self.width(), self.height()
-        tri = QPolygon([QPoint(w, h), QPoint(w - 15, h), QPoint(w, h - 15)])
-        painter.drawPolygon(tri)
-        painter.end()
-        super().paintEvent(event)
 
     def update_result(self, result):
         """
@@ -303,20 +302,20 @@ class ResultCardWidget(QFrame):
 
         score = result.get('情绪稳定度分数', 0.0)
         level = result.get('情绪状态等级', '未知')
-        color = result.get('等级颜色', '#8A8580')
+        color = result.get('等级颜色', _TEXT_SECONDARY)
         main_emotion = result.get('主要情绪', '未知')
         confidence = result.get('置信度', 0.0)
 
         # 主要情绪
         self.emotion_value.setText(main_emotion)
-        self.emotion_value.setStyleSheet(f"color: #2B2B2B;")
+        self.emotion_value.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         self.emotion_confidence.setText(f"置信度 {confidence:.1%}")
 
         # 稳定度
         self.stability_value.setText(f"{score:.1f}")
-        self.stability_value.setStyleSheet(f"color: {color};")
+        self.stability_value.setStyleSheet(f"color: {color}; background: transparent;")
         self.stability_level.setText(level)
-        self.stability_level.setStyleSheet(f"color: {color};")
+        self.stability_level.setStyleSheet(f"color: {color}; background: transparent;")
 
         # VAD 维度
         valence = result.get('valence_score', 0.0)
@@ -347,23 +346,22 @@ class ResultCardWidget(QFrame):
             q_label = audio_quality.get('quality_label', '')
             issues = audio_quality.get('issues', [])
             if issues:
-                self.quality_label.setText(f"录音质量: {q_label} ({q_score:.2f}) | ⚠ {', '.join(issues[:2])}")
+                self.quality_label.setText(f"录音质量: {q_label} ({q_score:.2f})  ·  {', '.join(issues[:2])}")
             else:
                 self.quality_label.setText(f"录音质量: {q_label} ({q_score:.2f})")
             self.quality_label.show()
         else:
             self.quality_label.hide()
 
-        # 可靠性标签
+        # 可靠性标签 — 极简色彩编码（高=绿、中=灰、低=红）
         reliability = result.get('assessment_reliability', '')
         if reliability:
-            # 高→炭黑（正面强调）、中→暖灰、低→砖红（警示），三者可区分
-            rel_colors = {"高": "#2B2B2B", "中": "#8A8580", "低": "#C44B4F"}
-            rel_color = rel_colors.get(reliability, "#8A8580")
+            rel_colors = {"高": _SUCCESS, "中": _TEXT_SECONDARY, "低": _ERROR}
+            rel_color = rel_colors.get(reliability, _TEXT_SECONDARY)
             self.reliability_label.setText(f"可靠性: {reliability}")
             self.reliability_label.setStyleSheet(
-                f"color: {rel_color}; font-weight: bold; background: #F2EDE4; "
-                f"border: 2px solid {rel_color}; padding: 4px 16px;"
+                f"color: {rel_color}; font-weight: bold; background: {_BG_SECONDARY}; "
+                f"border: 1px solid {rel_color}; border-radius: 4px; padding: 4px 16px;"
             )
             self.reliability_label.show()
         else:

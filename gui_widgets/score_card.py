@@ -1,65 +1,68 @@
 # -*- coding: utf-8 -*-
 """
-分数卡片控件 — 苏联构成主义风格
+分数卡片控件 — 极简主义风格
 
 自定义的分数展示卡片控件，用于在结果区域展示：
 - 情绪稳定度分数
 - 情绪状态等级
 - 主要情绪
 
-设计特点：
-- 构成主义风格：粗炭黑边框、直角、红色楔形装饰
+设计特点（极简主义 / 瑞士风格）：
+- 浅灰背景 + 细线边框，无装饰图案
 - 等宽粗体数字展示为视觉焦点
 - 支持自定义颜色和副标题
+- 适度圆角（4px）增加柔和感
 
 作者：Jiawei Li
 许可证：GPL v3
 """
 
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QLabel, QSizePolicy
-from PyQt5.QtCore import Qt, QPoint
-from PyQt5.QtGui import QFont, QColor, QPainter, QPen, QPolygon
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
+
+from .fonts import UI_FONT, MONO_FONT
 
 
 class ScoreCard(QFrame):
     """
-    分数卡片控件类 - 苏联构成主义风格
+    分数卡片控件类 - 极简主义风格
 
     参数：
         title (str): 卡片标题
         parent: 父窗口部件
-        accent_color (str): 装饰色（砖红）
+        accent_color (str): 装饰色（蓝色，用于值的高亮，默认 #1A73E8）
         compact (bool): 是否为紧凑模式（用于右侧小卡片）
     """
-    def __init__(self, title, parent=None, accent_color="#C44B4F", compact=False):
+    def __init__(self, title, parent=None, accent_color="#1A73E8", compact=False):
         super().__init__(parent)
         self.setObjectName("scoreCard")
         self._accent_color = accent_color
         self._compact = compact
 
         if compact:
-            self.setMinimumHeight(90)
-            self.setMaximumHeight(120)
+            self.setMinimumHeight(104)
+            self.setMaximumHeight(140)
             self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            title_font = QFont("Microsoft YaHei", 10, QFont.Bold)
-            value_font = QFont("Consolas", 26, QFont.Bold)
-            sub_font = QFont("Microsoft YaHei", 9)
-            margins = (12, 10, 12, 8)
-            spacing = 4
-            title_h = 18
-            value_h = 34
-            sub_h = 16
+            title_font = QFont(UI_FONT, 11, QFont.Medium)
+            value_font = QFont(MONO_FONT, 30, QFont.Bold)
+            sub_font = QFont(UI_FONT, 10)
+            margins = (16, 14, 16, 12)
+            spacing = 6
+            title_h = 22
+            value_h = 40
+            sub_h = 18
         else:
-            self.setMinimumHeight(180)
+            self.setMinimumHeight(200)
             self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-            title_font = QFont("Microsoft YaHei", 11, QFont.Bold)
-            value_font = QFont("Consolas", 38, QFont.Bold)
-            sub_font = QFont("Microsoft YaHei", 11)
-            margins = (25, 22, 25, 22)
+            title_font = QFont(UI_FONT, 12, QFont.Medium)
+            value_font = QFont(MONO_FONT, 42, QFont.Bold)
+            sub_font = QFont(UI_FONT, 12)
+            margins = (24, 24, 24, 24)
             spacing = 10
-            title_h = 25
-            value_h = 60
-            sub_h = 25
+            title_h = 26
+            value_h = 66
+            sub_h = 26
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(*margins)
@@ -86,28 +89,6 @@ class ScoreCard(QFrame):
         self.sub_label.setFont(sub_font)
         self.sub_label.setMinimumHeight(sub_h)
         layout.addWidget(self.sub_label)
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing, False)
-        # 炭黑粗边框
-        pen = QPen(QColor("#2B2B2B"))
-        pen.setWidth(3)
-        painter.setPen(pen)
-        painter.drawRect(2, 2, self.width()-4, self.height()-4)
-        # 左上角大型红色楔形（指向右下）
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(self._accent_color))
-        wedge = QPolygon([QPoint(0, 0), QPoint(25, 0), QPoint(0, 25)])
-        painter.drawPolygon(wedge)
-        # 右下角炭黑小三角
-        painter.setBrush(QColor("#2B2B2B"))
-        tri = QPolygon([QPoint(self.width(), self.height()),
-                       QPoint(self.width() - 12, self.height()),
-                       QPoint(self.width(), self.height() - 12)])
-        painter.drawPolygon(tri)
-        painter.end()
-        super().paintEvent(event)
 
     def set_value(self, value, color=None, sub_text=""):
         self.value_label.setText(str(value))

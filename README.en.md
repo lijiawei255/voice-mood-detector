@@ -15,7 +15,7 @@ Voice Mood Detector is a deep learning-based desktop application that records yo
 
 The system adopts a **portable mode** design — all user data (recordings, models, history, logs, etc.) is saved in the program folder. You can copy the entire program folder to migrate all data without polluting system directories.
 
-The UI follows **Soviet Constructivist** design principles: thick charcoal-black borders, brick-red accents (#C44B4F), 45° diagonal textures, triangular wedge decorations, pure geometry with no rounded corners, warm off-white industrial base (#F2EDE4), and asymmetrical card layouts.
+The UI follows a **minimalist (Swiss/Bauhaus)** design: a clean white background, thin hairline borders, a single blue accent color (#1A73E8), generous whitespace, subtle rounded corners, and no decorative elements — function over ornament. Typography uses **Microsoft YaHei UI** for text and **Cascadia Code** for numeric displays (with graceful fallbacks), at comfortable, readable sizes.
 
 > ⚠️ **Disclaimer**: This software is for personal non-commercial reference only. The detection results are only an auxiliary reference for emotional state and do not constitute any medical diagnosis or advice. If you have persistent emotional distress, please consult a professional psychologist promptly.
 
@@ -40,7 +40,7 @@ The UI follows **Soviet Constructivist** design principles: thick charcoal-black
 | 📡 Acoustic Feature Extraction | Clinical-grade features: F0, jitter, shimmer, HNR, MFCC |
 | 🧠 Psychological Indicators | Stress, anxiety, depression tendency, activation, speech-stability estimates (non-clinical) |
 | 🎚️ Personal Baseline | Collect 3-10 calm samples to build a baseline and show relative deviation |
-| 🔬 Research Mode | Ambient noise check, unified prompt, quality gate, 3-sample recording, optional dual-model validation |
+| 🔬 Research Mode | Unified prompt, quality gate, 3-sample recording, optional dual-model validation |
 | 📤 Research Data Export | CSV (SPSS/Excel compatible) & JSON full research dataset export |
 | 📊 History Statistics | Descriptive statistics and trend analysis for stability and VAD dimensions |
 | 🎚️ Stability Factor Breakdown | Negative weight, entropy, extremity sub-scores output |
@@ -219,24 +219,29 @@ git clone https://github.com/lijiawei255/voice-mood-detector.git
 cd Voice_Mood_Detect
 ```
 
-2. **Create virtual environment (recommended)**
+2. **Create an Anaconda virtual environment (recommended)**
+
+This project depends on PyQt5, librosa, PyTorch, funasr, etc. **Using Anaconda to create an isolated environment is strongly recommended** to avoid dependency conflicts and PyAudio build failures:
 
 ```bash
-python -m venv venv
-# Windows
-venv\Scripts\activate
+# Create an environment named audio (Python 3.10 tested; 3.8~3.11 all work)
+conda create -n audio python=3.10 -y
+conda activate audio
+
+# Install libraries that require local compilation (PyAudio) via conda first
+conda install -c conda-forge pyaudio -y
 ```
 
-3. **Install dependencies**
+3. **Install the remaining dependencies**
 
 ```bash
+# Make sure you are still in the audio environment
 pip install -r requirements.txt
 ```
 
-> 💡 **Tip**: If PyAudio installation fails, try using conda:
-> ```bash
-> conda install pyaudio -y
-> ```
+> 💡 **Tip**: If `pip install` still fails on PyAudio, install it separately with `conda install -c conda-forge pyaudio` above, then re-run `pip install -r requirements.txt`.
+
+> 🔬 **Vocal-quality analysis**: Vocal-quality features such as jitter / shimmer / HNR are extracted by **praat-parselmouth** (Praat algorithms, the clinical gold standard for voice analysis) by default; if it is not installed, a lower-accuracy librosa approximation is used automatically. `praat-parselmouth>=0.4.0` is already listed in `requirements.txt`.
 
 ### Run the Program
 
@@ -269,10 +274,9 @@ python main.py
 
 1. Select **"Research Mode"** in the recording control area
 2. Click **"Start Research Assessment"**
-3. The system performs a ~3-second ambient noise check
-4. Record 3 samples following the unified prompt (10-30 seconds each)
-5. Each sample passes an audio quality gate; re-record if it fails
-6. After 3 samples, the system outputs:
+3. Record 3 samples following the unified prompt (10-30 seconds each)
+4. Each sample passes an audio quality gate; re-record if it fails
+5. After 3 samples, the system outputs:
    - Detailed emotion analysis for each sample
    - Session-level dominant emotion and mean stability
    - Multi-sample consistency / overall reliability
@@ -293,7 +297,7 @@ python main.py
 - **Compound Emotions**: Higher-order emotional states composed of basic emotions
 - **VAD Dimensions**: Valence, Arousal, Dominance, and Negative Load
 - **Stability Factors**: Negative weight, emotion dispersion (entropy), and extremity sub-scores
-- **Acoustic Features**: F0, jitter, shimmer, HNR, speech rate, silence ratio, etc.
+- **Acoustic Features**: F0, jitter, shimmer, HNR, speech rate, silence ratio, etc. (vocal-quality metrics extracted by praat-parselmouth for clinical-grade accuracy)
 - **Psychological Indicators**: Stress, anxiety, depression tendency, activation, speech stability (non-clinical)
 - **Reliability**: High/Medium/Low rating combining audio quality, confidence, and consistency
 - **Baseline Deviation**: z-score deviation relative to an established personal baseline
@@ -363,10 +367,10 @@ Voice_Mood_Detect/
 ├── main.py                 # Entry point: env config + PyQt5 app launch
 ├── gui.py                  # GUI: main window, widgets, interaction logic
 ├── emotion_recognizer.py   # Emotion recognition core: model + inference + algorithms
-├── research_session.py     # Research-mode orchestration (noise check / multi-sample / dual-model)
+├── research_session.py     # Research-mode orchestration (multi-sample / quality gate / dual-model)
 ├── recorder.py             # Audio recording: threaded recording + WAV save
 ├── history_manager.py      # History management: atomic write + data sanitization
-├── audio_features.py       # Acoustic feature extraction (F0 / jitter / shimmer / HNR / MFCC)
+├── audio_features.py       # Acoustic feature extraction (F0 / jitter / shimmer / HNR / MFCC, via praat-parselmouth)
 ├── audio_quality.py        # Audio quality analysis (volume / noise / clipping / speech ratio)
 ├── baseline.py             # Personal baseline modeling and deviation assessment
 ├── reliability.py          # Assessment reliability (ICC / multi-sample / model agreement)
@@ -411,6 +415,7 @@ main.py
               ├── chart.py / research_panel.py          (trend / radar charts)
               ├── baseline_panel.py / stats_panel.py    (baseline / stats panel)
               ├── score_card.py / background.py         (score card / background)
+              ├── fonts.py                              (UI_FONT / MONO_FONT definitions)
               ├── threads.py / toast.py                 (worker threads / toasts)
               └── __init__.py
 ```
@@ -483,11 +488,14 @@ git clone https://github.com/lijiawei255/voice-mood-detector.git
 cd Voice_Mood_Detect
 
 # Create virtual environment
-python -m venv venv
-venv\Scripts\activate
+# Create an Anaconda environment (same as Quick Start)
+conda create -n audio python=3.10 -y
+conda activate audio
+conda install -c conda-forge pyaudio -y
 
-# Install development dependencies
+# Install development dependencies (includes runtime deps)
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
 # Run the program
 python main.py

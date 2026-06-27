@@ -15,6 +15,7 @@
 
 系统采用**便携模式**设计，所有用户数据（录音、模型、历史记录、日志等）都保存在程序文件夹中，复制整个程序文件夹即可迁移所有数据，不污染系统目录。
 
+界面采用**极简主义（瑞士/包豪斯）**设计风格：纯白背景、细线边框、单一蓝色强调色（#1A73E8）、大量留白、适度圆角、无装饰元素——功能优先。字体使用 **微软雅黑 UI**（中文）与 **Cascadia Code**（数字），字号舒适易读（支持回退）。
 
 > ⚠️ **免责声明**：本软件仅供个人非商用参考使用，检测结果仅作为情绪状态的辅助参考，不构成任何医疗诊断或建议。如有持续的情绪困扰，请及时咨询专业心理医生。
 
@@ -39,7 +40,7 @@
 | 📡 声学特征提取 | F0、jitter、shimmer、HNR、MFCC 等临床级语音特征 |
 | 🧠 心理状态指标 | 压力、焦虑、低落倾向、情绪激活度、语音稳定性估计（非临床诊断） |
 | 🎚️ 个人基线 | 采集 3-10 条平静语音建立个人基线，显示相对偏移 |
-| 🔬 科研评估模式 | 环境噪声检测、统一提示语、质量门控、3 段采样、可选双模型验证 |
+| 🔬 科研评估模式 | 统一提示语、质量门控、3 段采样、可选双模型验证 |
 | 📤 研究数据导出 | CSV (SPSS/Excel 兼容) 和 JSON 完整研究数据集导出 |
 | 📊 历史统计分析 | 稳定度、VAD 维度的描述统计与趋势分析 |
 | 🎚️ 稳定度分项解释 | 负面加权、情绪分散度、极端度三因子分项输出 |
@@ -217,24 +218,29 @@ git clone https://github.com/lijiawei255/voice-mood-detector.git
 cd Voice_Mood_Detect
 ```
 
-2. **创建虚拟环境（推荐）**
+2. **创建 Anaconda 虚拟环境（推荐）**
+
+本项目依赖 PyQt5、librosa、PyTorch、funasr 等，**强烈建议使用 Anaconda 创建独立环境**，可避免依赖冲突与 PyAudio 编译失败等问题：
 
 ```bash
-python -m venv venv
-# Windows
-venv\Scripts\activate
+# 创建名为 audio 的环境（Python 3.10 已测试通过，3.8~3.11 均可）
+conda create -n audio python=3.10 -y
+conda activate audio
+
+# 优先用 conda 安装需要本地编译的库（PyAudio）
+conda install -c conda-forge pyaudio -y
 ```
 
-3. **安装依赖**
+3. **安装其余依赖**
 
 ```bash
+# 确保仍在刚创建的 audio 环境中
 pip install -r requirements.txt
 ```
 
-> 💡 **提示**：如果 PyAudio 安装失败，可以尝试使用 conda 安装：
-> ```bash
-> conda install pyaudio -y
-> ```
+> 💡 **提示**：若 `pip install` 时 PyAudio 仍报错，请用上一步的 `conda install -c conda-forge pyaudio` 单独安装，再重新 `pip install -r requirements.txt`。
+
+> 🔬 **声带音质分析**：jitter / shimmer / HNR 等声带音质特征默认使用 **praat-parselmouth**（Praat 算法，临床语音分析金标准）提取；若未安装则自动降级为 librosa 近似（精度较低）。`praat-parselmouth>=0.4.0` 已包含在 `requirements.txt` 中。
 
 ### 运行程序
 
@@ -267,10 +273,9 @@ python main.py
 
 1. 在录音控制区选择 **「科研评估」** 模式
 2. 点击 **「开始科研评估」** 按钮
-3. 系统会先进行约 3 秒的环境噪声检测
-4. 按提示用统一内容录制 3 段语音（每段建议 10-30 秒）
-5. 每段录音会通过音频质量门控；不满足要求时可重新录制
-6. 完成 3 段采样后，系统输出：
+3. 按提示用统一内容录制 3 段语音（每段建议 10-30 秒）
+4. 每段录音会通过音频质量门控；不满足要求时可重新录制
+5. 完成 3 段采样后，系统输出：
    - 每段样本的详细情绪分析
    - 会话主要情绪与稳定度均值
    - 多次采样一致性 / 综合可靠性
@@ -291,7 +296,7 @@ python main.py
 - **复合情绪**：由基础情绪组合而成的高级情绪状态
 - **VAD 维度**：效价(Valence)、唤醒度(Arousal)、掌控感(Dominance)、负性负荷
 - **稳定度因子**：负面加权、情绪分散度(熵)、极端度三因子分项
-- **声学特征**：F0、jitter、shimmer、HNR、语速、静音比等
+- **声学特征**：F0、jitter、shimmer、HNR、语速、静音比等（声带音质指标由 praat-parselmouth 提取专业级精度）
 - **心理状态指标**：压力、焦虑、低落倾向、情绪激活度、语音稳定性（非临床诊断）
 - **可靠性**：综合音频质量、置信度与一致性的高/中/低评级
 - **个人基线偏移**：相对已建立个人基线的 z-score 偏移
@@ -361,10 +366,10 @@ Voice_Mood_Detect/
 ├── main.py                 # 程序入口：环境配置 + PyQt5 应用启动
 ├── gui.py                  # 图形界面：主窗口、控件、交互逻辑
 ├── emotion_recognizer.py   # 情绪识别核心：模型管理 + 推理 + 算法
-├── research_session.py     # 科研模式流程编排（噪声检测 / 多采样 / 双模型验证）
+├── research_session.py     # 科研模式流程编排（多采样 / 质量门控 / 双模型验证）
 ├── recorder.py             # 音频录制：线程化录音 + WAV 保存
 ├── history_manager.py      # 历史管理：原子写入 + 数据清洗
-├── audio_features.py       # 声学特征提取（F0 / jitter / shimmer / HNR / MFCC）
+├── audio_features.py       # 声学特征提取（F0 / jitter / shimmer / HNR / MFCC，via praat-parselmouth）
 ├── audio_quality.py        # 音频质量分析（音量 / 噪声 / 爆音 / 有效语音比）
 ├── baseline.py             # 个人基线建模与偏移评估
 ├── reliability.py          # 评估可靠性（ICC / 多采样一致性 / 模型一致性）
@@ -409,6 +414,7 @@ main.py
               ├── chart.py / research_panel.py          (趋势图 / 雷达图)
               ├── baseline_panel.py / stats_panel.py    (基线 / 统计面板)
               ├── score_card.py / background.py         (分数卡 / 背景)
+              ├── fonts.py                              (字体集中定义 UI_FONT/MONO_FONT)
               ├── threads.py / toast.py                 (后台线程 / 通知)
               └── __init__.py
 ```
@@ -480,12 +486,14 @@ portable_data/
 git clone https://github.com/lijiawei255/voice-mood-detector.git
 cd Voice_Mood_Detect
 
-# 创建虚拟环境
-python -m venv venv
-venv\Scripts\activate
+# 创建 Anaconda 虚拟环境（与快速开始一致）
+conda create -n audio python=3.10 -y
+conda activate audio
+conda install -c conda-forge pyaudio -y
 
-# 安装开发依赖
+# 安装开发依赖（含运行依赖）
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
 # 运行程序
 python main.py

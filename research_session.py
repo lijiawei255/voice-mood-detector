@@ -3,12 +3,11 @@
 语音情绪识别系统 - 科研评估会话模块 (P1)
 
 本模块实现科研评估模式的完整流程编排：
-1. 环境噪声预检测（约 3 秒）
-2. 统一提示语录音（建议 10-30 秒）
-3. 音频质量门控（有效语音、音量、噪声、时长）
-4. 多次采样综合评估（默认 3 段）
-5. 双模型规模敏感性验证
-6. 多次采样一致性分析
+1. 统一提示语录音（建议 10-30 秒）
+2. 音频质量门控（有效语音、音量、噪声、时长）
+3. 多次采样综合评估（默认 3 段）
+4. 双模型规模敏感性验证
+5. 多次采样一致性分析
 
 使用方式：
     session = ResearchSession(recorder, recognizer)
@@ -44,7 +43,6 @@ class ResearchSession:
 
     # 默认配置
     DEFAULT_N_SAMPLES = 3
-    NOISE_CHECK_SECONDS = 3
     RESEARCH_MIN_DURATION = 10
     RESEARCH_MAX_DURATION = 30
 
@@ -59,6 +57,7 @@ class ResearchSession:
         self.recorder = recorder
         self.recognizer = recognizer
         self.cancelled = False
+        self._stop_sample = False
         self._lock = threading.Lock()
 
     def cancel(self):
@@ -75,93 +74,78 @@ class ResearchSession:
         with self._lock:
             return self.cancelled
 
-    def check_environment_noise(self, duration=3):
+    def request_stop_current_sample(self):
         """
-        检测环境噪声水平
+        请求停止当前段录音（不取消整个会话）
 
-        参数：
-            duration (int): 检测时长（秒）
+        与 cancel() 的区别：仅结束当前正在录制的样本，会话继续进入
+        质量门控与下一段采样。用于让用户手动结束某段录音。
 
-        返回值：
-            dict: {"noise_level": 噪声水平, "ok": 是否适合录音, "message": 提示文本}
+        线程安全：由主线程调用，record_sample 在后台线程轮询该标志。
         """
+        with self._lock:
+            self._stop_sample = True
+        # 立即停止录音，让 record_sample 的等待循环尽快退出
         try:
-            import tempfile
-            temp_path = tempfile.mktemp(suffix=".wav")
-            success = self.recorder.start_recording(temp_path)
-            if not success:
-                return {"noise_level": 1.0, "ok": False, "message": "无法启动环境检测"}
-
-            waited = 0.0
-            while waited < duration and not self._is_cancelled():
-                time.sleep(0.2)
-                waited += 0.2
-
-            self.recorder.stop_recording()
-
-            if self._is_cancelled():
-                return {"noise_level": 1.0, "ok": False, "message": "环境检测已取消"}
-
-            analyzer = AudioQualityAnalyzer()
-            quality = analyzer.analyze(temp_path)
-            try:
-                os.remove(temp_path)
-            except Exception:
-                pass
-
-            if not quality:
-                return {"noise_level": 1.0, "ok": False, "message": "环境检测失败"}
-
-            noise_level = quality.get("noise_level", 1.0)
-            max_noise = AUDIO_QUALITY_THRESHOLDS.get("max_noise_level", 0.3)
-            ok = noise_level < max_noise
-            message = (
-                "环境噪声较低，适合录音" if ok
-                else "环境噪声较高，请在安静环境中重新检测"
-            )
-            return {"noise_level": noise_level, "ok": ok, "message": message}
-
+            if self.recorder.is_recording():
+                self.recorder.stop_recording()
         except Exception as e:
-            logger.error(f"环境噪声检测失败: {e}")
-            return {"noise_level": 1.0, "ok": False, "message": f"检测异常: {e}"}
+            logger.warning(f"手动停止当前段录音失败: {e}")
+
+    def _is_stop_sample_requested(self):
+        with self._lock:
+            return self._stop_sample
 
     def quality_gate(self, audio_path, is_research=True):
         """
         对录音进行质量门控检查
+
+        仅当出现「致命」问题（时长不足/过长、爆音）时不通过；噪声/语音比例/
+        音量偏低仅作为 warning 返回，不阻断科研流程（对真实麦克风录音保持
+        宽容）。
 
         参数：
             audio_path (str): 音频文件路径
             is_research (bool): 是否使用科研模式更严格阈值
 
         返回值：
-            dict: {"passed": bool, "quality": dict, "reason": str}
+            dict: {"passed": bool, "quality": dict, "reason": str, "warnings": list}
         """
         analyzer = AudioQualityAnalyzer()
         quality = analyzer.analyze(audio_path)
         if not quality:
-            return {"passed": False, "quality": {}, "reason": "无法分析音频质量"}
+            return {"passed": False, "quality": {}, "reason": "无法分析音频质量", "warnings": []}
 
-        issues = quality.get("issues", [])
+        # 致命问题（来自 analyzer 的 issues）+ 科研模式时长约束
+        fatal = list(quality.get("issues", []))
+        warnings = list(quality.get("warnings", []))
         duration = quality.get("duration", 0)
         thresholds = AUDIO_QUALITY_THRESHOLDS
 
         if is_research:
             if duration < thresholds.get("research_min_duration", 3):
-                issues.append(f"科研模式录音时长不足（需 ≥{thresholds.get('research_min_duration')} 秒）")
+                fatal.append(f"科研模式录音时长不足（需 ≥{thresholds.get('research_min_duration')} 秒）")
             if duration > thresholds.get("research_max_duration", 30):
-                issues.append(f"科研模式录音时长过长（需 ≤{thresholds.get('research_max_duration')} 秒）")
+                fatal.append(f"科研模式录音时长过长（需 ≤{thresholds.get('research_max_duration')} 秒）")
         else:
             if duration < thresholds.get("min_duration", 1):
-                issues.append("录音时长过短")
+                fatal.append("录音时长过短")
 
-        if issues:
+        if fatal:
             return {
                 "passed": False,
                 "quality": quality,
-                "reason": "；".join(issues),
+                "reason": "；".join(fatal),
+                "warnings": warnings,
             }
 
-        return {"passed": True, "quality": quality, "reason": ""}
+        # 无致命问题即放行（warnings 仅作提示，不影响 passed）
+        return {
+            "passed": True,
+            "quality": quality,
+            "reason": "",
+            "warnings": warnings,
+        }
 
     def record_sample(self, output_path, max_duration=30, progress_callback=None):
         """
@@ -180,7 +164,10 @@ class ResearchSession:
             return False
 
         elapsed = 0.0
-        while elapsed < max_duration and self.recorder.is_recording() and not self._is_cancelled():
+        while (elapsed < max_duration
+               and self.recorder.is_recording()
+               and not self._is_cancelled()
+               and not self._is_stop_sample_requested()):
             time.sleep(0.2)
             elapsed += 0.2
             if progress_callback and int(elapsed * 5) % 5 == 0:
@@ -191,6 +178,13 @@ class ResearchSession:
 
         if self.recorder.is_recording():
             self.recorder.stop_recording()
+
+        # 用户请求仅停止当前段（非取消整个会话）：重置标志，视为本段成功录制，
+        # 让会话继续进入质量门控（过短则由 quality_gate 优雅反馈）
+        if self._is_stop_sample_requested():
+            with self._lock:
+                self._stop_sample = False
+            return os.path.exists(output_path) and not self._is_cancelled()
 
         return not self._is_cancelled() and os.path.exists(output_path)
 
@@ -237,21 +231,11 @@ class ResearchSession:
                     pass
 
         try:
-            _report("prepare", "科研评估模式启动", 0)
+            _report("prepare", "科研评估模式启动", 5)
 
-            # 1. 环境噪声检测
-            _report("noise", "正在进行 3 秒环境噪声检测，请保持安静...", 5)
-            noise_result = self.check_environment_noise(duration=self.NOISE_CHECK_SECONDS)
-            if not noise_result["ok"]:
-                error_result = {"success": False, "error": noise_result["message"], "phase": "noise_check"}
-                if finished_callback:
-                    finished_callback(error_result)
-                return error_result
-            _report("noise", f"环境检测通过：{noise_result['message']}", 10)
-
-            # 2. 多次采样录音
+            # 1. 多次采样录音
             if prompt_text:
-                _report("prompt", f"提示语：{prompt_text}", 12)
+                _report("prompt", f"提示语：{prompt_text}", 8)
 
             for i in range(n_samples):
                 if self._is_cancelled():
@@ -262,7 +246,7 @@ class ResearchSession:
 
                 _report(
                     "record",
-                    f"第 {i+1}/{n_samples} 段录音：请按提示语朗读（建议 {self.RESEARCH_MIN_DURATION}-{self.RESEARCH_MAX_DURATION} 秒，最短 {int(AUDIO_QUALITY_THRESHOLDS.get('research_min_duration', 3.0))} 秒）",
+                    f"第 {i+1}/{n_samples} 段录音：请按提示语朗读（建议 {self.RESEARCH_MIN_DURATION}-{self.RESEARCH_MAX_DURATION} 秒，最短 {int(AUDIO_QUALITY_THRESHOLDS.get('research_min_duration', 10.0))} 秒）",
                     10 + (i + 1) * 20 // n_samples,
                 )
 

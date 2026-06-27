@@ -5,12 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Environment
 
 ```bash
-# Create and activate a virtual environment (recommended)
-python -m venv venv
-# Windows
-venv\Scripts\activate
-# macOS / Linux
-source venv/bin/activate
+# Create and activate an Anaconda environment (recommended, named `audio`)
+conda create -n audio python=3.10 -y
+conda activate audio
+
+# Install libraries that need local compilation (PyAudio) via conda first
+conda install -c conda-forge pyaudio -y
 
 # Install dependencies
 pip install -r requirements.txt
@@ -18,7 +18,7 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 ```
 
-Supported Python versions: 3.8 ~ 3.11. PyQt5 is required for GUI tests; headless/CI tests skip GUI imports if PyQt5 is unavailable.
+Supported Python versions: 3.8 ~ 3.11 (3.10 tested). PyQt5 is required for GUI tests; headless/CI tests skip GUI imports if PyQt5 is unavailable.
 
 ## Run
 
@@ -32,8 +32,9 @@ python main.py
 # Run all tests
 python -m pytest tests/ -v
 
-# Latest status (standalone Python 3.11 without PyQt5): 150 passed, 10 skipped
-# (With PyQt5 installed, the 10 GUI-skipped tests also run.)
+# Latest status:
+#   - With PyQt5 installed (anaconda `audio` env): 153 passed, 7 skipped
+#   - Headless/CI without PyQt5: ~150 passed, 10 skipped (GUI tests auto-skip)
 
 # Run a single test
 python -m pytest tests/test_emotion.py -v
@@ -74,7 +75,7 @@ Microphone → AudioRecorder → WAV file → AudioQualityAnalyzer
 | `gui.py` | Main GUI (~3000 lines) — MainWindow, tabs, dialogs, threads, result layout |
 | `gui_widgets/` | Reusable widget package — ResultCardWidget, ResearchRadarChart, BaselinePanel, StatsPanel, ScoreCard, assessment cards |
 | `emotion_recognizer.py` | AI inference wrapper — singleton, loads emotion2vec+ via FunASR, runs `predict()` with full P0/P1/P2 enrichment |
-| `research_session.py` | Research-mode orchestrator — noise check, quality gates, multi-sample recording, dual-model validation |
+| `research_session.py` | Research-mode orchestrator — quality gates, multi-sample recording, dual-model validation |
 | `recorder.py` | AudioRecorder — PyAudio-based microphone capture to WAV |
 | `history_manager.py` | JSON-based history CRUD, auto-cleanup, statistics aggregation |
 | `audio_features.py` | Acoustic feature extraction (F0, jitter, shimmer, HNR, MFCC) via librosa + praat-parselmouth fallback |
@@ -112,7 +113,9 @@ MainWindow (1500×1000 default)
 
 ### Design Style
 
-Soviet Constructivist (苏联构成主义): thick charcoal borders (#2B2B2B), brick-red accents (#C44B4F), warm off-white background (#F2EDE4/#E8E3DA), 45° diagonal textures, triangular wedge decorations, no rounded corners, bold typography.
+极简主义（瑞士/包豪斯现代极简）：纯白背景 (#FFFFFF)，浅灰次背景 (#F5F5F7)，文字主色 #1D1D1F / 次色 #86868B，蓝色强调 #1A73E8，细线边框 (#D2D2D7)，适度圆角 (4-8px)，状态色（成功 #34A853 / 警告 #F9AB00 / 错误 #EA4335）。无装饰图案、无三角形/楔形、无斜线纹理，功能优先。
+
+历史背景：本应用早期采用「苏联构成主义」风格（粗炭黑边框、砖红强调、三角装饰），于 2026-06-27 重构为极简主义风格。
 
 ### Data Flow
 
@@ -126,7 +129,7 @@ Soviet Constructivist (苏联构成主义): thick charcoal borders (#2B2B2B), br
 - Keep CPU-only inference path robust; do not assume GPU availability.
 - Maintain the test suite when adding backend fields or GUI cards.
 - Avoid adding heavy runtime dependencies; prefer librosa + parselmouth over proprietary toolkits.
-- When modifying GUI layouts, run `python tests/capture_screenshots.py` (requires display) and inspect `portable_data/temp/screenshots/`.
+- When modifying GUI layouts, capture screenshots manually via the running app (requires a display) and inspect `portable_data/temp/screenshots/`.
 
 ## Git Workflow
 
