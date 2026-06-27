@@ -100,39 +100,52 @@ class ResearchSession:
         """
         对录音进行质量门控检查
 
+        仅当出现「致命」问题（时长不足/过长、爆音）时不通过；噪声/语音比例/
+        音量偏低仅作为 warning 返回，不阻断科研流程（对真实麦克风录音保持
+        宽容）。
+
         参数：
             audio_path (str): 音频文件路径
             is_research (bool): 是否使用科研模式更严格阈值
 
         返回值：
-            dict: {"passed": bool, "quality": dict, "reason": str}
+            dict: {"passed": bool, "quality": dict, "reason": str, "warnings": list}
         """
         analyzer = AudioQualityAnalyzer()
         quality = analyzer.analyze(audio_path)
         if not quality:
-            return {"passed": False, "quality": {}, "reason": "无法分析音频质量"}
+            return {"passed": False, "quality": {}, "reason": "无法分析音频质量", "warnings": []}
 
-        issues = quality.get("issues", [])
+        # 致命问题（来自 analyzer 的 issues）+ 科研模式时长约束
+        fatal = list(quality.get("issues", []))
+        warnings = list(quality.get("warnings", []))
         duration = quality.get("duration", 0)
         thresholds = AUDIO_QUALITY_THRESHOLDS
 
         if is_research:
             if duration < thresholds.get("research_min_duration", 3):
-                issues.append(f"科研模式录音时长不足（需 ≥{thresholds.get('research_min_duration')} 秒）")
+                fatal.append(f"科研模式录音时长不足（需 ≥{thresholds.get('research_min_duration')} 秒）")
             if duration > thresholds.get("research_max_duration", 30):
-                issues.append(f"科研模式录音时长过长（需 ≤{thresholds.get('research_max_duration')} 秒）")
+                fatal.append(f"科研模式录音时长过长（需 ≤{thresholds.get('research_max_duration')} 秒）")
         else:
             if duration < thresholds.get("min_duration", 1):
-                issues.append("录音时长过短")
+                fatal.append("录音时长过短")
 
-        if issues:
+        if fatal:
             return {
                 "passed": False,
                 "quality": quality,
-                "reason": "；".join(issues),
+                "reason": "；".join(fatal),
+                "warnings": warnings,
             }
 
-        return {"passed": True, "quality": quality, "reason": ""}
+        # 无致命问题即放行（warnings 仅作提示，不影响 passed）
+        return {
+            "passed": True,
+            "quality": quality,
+            "reason": "",
+            "warnings": warnings,
+        }
 
     def record_sample(self, output_path, max_duration=30, progress_callback=None):
         """
