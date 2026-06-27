@@ -19,7 +19,7 @@ GUI 部件包 — 科研级评估报告卡片组件
 - ScoreCard: 构成主义分数卡片
 - ConstructivistBackground: 构成主义几何背景层
 - MplCanvas: matplotlib 趋势图表
-- RecordingThread / AnalysisThread / ModelLoadThread: 后台工作线程
+- RecordingThread / AnalysisThread: 后台工作线程（模型加载由 EmotionRecognizer 异步完成，无需独立线程）
 - ToastNotification / ToastManager: Toast 通知组件
 """
 
@@ -34,7 +34,7 @@ from .stats_panel import StatsPanel
 from .score_card import ScoreCard
 from .background import ConstructivistBackground
 from .chart import MplCanvas
-from .threads import RecordingThread, AnalysisThread, ModelLoadThread
+from .threads import RecordingThread, AnalysisThread
 from .toast import ToastNotification, ToastManager
 
 __all__ = [
@@ -45,6 +45,6 @@ __all__ = [
     'BaselinePanel', 'StatsPanel',
     'ScoreCard', 'ConstructivistBackground',
     'MplCanvas',
-    'RecordingThread', 'AnalysisThread', 'ModelLoadThread',
+    'RecordingThread', 'AnalysisThread',
     'ToastNotification', 'ToastManager',
 ]
