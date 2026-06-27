@@ -20,7 +20,9 @@ from PyQt5.QtWidgets import (
     QSizePolicy, QWidget
 )
 from PyQt5.QtCore import Qt, QRect
-from PyQt5.QtGui import QFont, QColor, QPainter, QBrush
+from PyQt5.QtGui import QFont, QColor, QPainter, QBrush, QFontMetrics
+
+from .fonts import UI_FONT, MONO_FONT
 
 
 # 极简主义色板常量（与 gui.py 主样式保持一致）
@@ -63,10 +65,18 @@ class DimensionBar(QWidget):
         self._range_max = range_max
         self._low_color = QColor(low_color)
         self._high_color = QColor(high_color)
-        self.setMinimumHeight(28)
-        self.setMaximumHeight(34)
-        # 保证标签(70) + 条形最小宽度 + 数值(55) 不致 bar_w 变为负值
-        self.setMinimumWidth(150)
+        # 用于绘制文本的字体（与 paintEvent 保持一致）
+        self._label_font = QFont(UI_FONT, 11)
+        self._value_font = QFont(MONO_FONT, 11, QFont.Bold)
+        # 根据字体度量动态计算标签与数值列宽，保证不截断
+        fm_label = QFontMetrics(self._label_font)
+        fm_value = QFontMetrics(self._value_font)
+        self._label_w = max(72, fm_label.width(self._label) + 12)
+        self._value_w = max(60, fm_value.width("-0.00") + 12)
+        self.setMinimumHeight(32)
+        self.setMaximumHeight(40)
+        # 保证标签 + 条形最小宽度 + 数值 不致 bar_w 变为负值
+        self.setMinimumWidth(self._label_w + self._value_w + 40)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     def paintEvent(self, event):
@@ -77,19 +87,19 @@ class DimensionBar(QWidget):
         h = self.height()
 
         # 标签
-        painter.setFont(QFont("Microsoft YaHei", 10))
+        painter.setFont(self._label_font)
         painter.setPen(QColor(_TEXT_SECONDARY))
-        label_rect = QRect(0, 0, 72, h)
+        label_rect = QRect(0, 0, self._label_w, h)
         painter.drawText(label_rect, Qt.AlignLeft | Qt.AlignVCenter, self._label)
 
         # 条形背景（圆角）
-        bar_x = 74
-        bar_w = max(0, w - bar_x - 56)
-        bar_h = 6
+        bar_x = self._label_w + 6
+        bar_w = max(0, w - bar_x - self._value_w - 4)
+        bar_h = 8
         bar_y = (h - bar_h) // 2
         painter.setPen(Qt.NoPen)
         painter.setBrush(QColor(_BG_TERTIARY))
-        painter.drawRoundedRect(bar_x, bar_y, bar_w, bar_h, 3, 3)
+        painter.drawRoundedRect(bar_x, bar_y, bar_w, bar_h, 4, 4)
 
         # 计算填充比例（居中于零点或从最小值开始）
         if self._range_min < 0:
@@ -122,13 +132,13 @@ class DimensionBar(QWidget):
             )
 
         painter.setBrush(QBrush(fill_color))
-        painter.drawRoundedRect(fill_x, bar_y, fill_w, bar_h, 3, 3)
+        painter.drawRoundedRect(fill_x, bar_y, fill_w, bar_h, 4, 4)
 
         # 数值文本
         painter.setPen(QColor(_TEXT_PRIMARY))
-        painter.setFont(QFont("Consolas", 10, QFont.Bold))
+        painter.setFont(self._value_font)
         val_str = f"{self._value:+.2f}" if self._range_min < 0 else f"{self._value:.2f}"
-        val_rect = QRect(bar_x + bar_w + 6, 0, 50, h)
+        val_rect = QRect(bar_x + bar_w + 6, 0, self._value_w, h)
         painter.drawText(val_rect, Qt.AlignLeft | Qt.AlignVCenter, val_str)
 
         painter.end()
@@ -169,11 +179,11 @@ class ResultCardWidget(QFrame):
         self.emotion_frame = self._make_sub_card("主要情绪")
         emotion_layout = QVBoxLayout(self.emotion_frame)
         self.emotion_value = QLabel("--")
-        self.emotion_value.setFont(QFont("Consolas", 32, QFont.Bold))
+        self.emotion_value.setFont(QFont(MONO_FONT, 36, QFont.Bold))
         self.emotion_value.setAlignment(Qt.AlignCenter)
         self.emotion_value.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         self.emotion_confidence = QLabel("")
-        self.emotion_confidence.setFont(QFont("Microsoft YaHei", 10))
+        self.emotion_confidence.setFont(QFont(UI_FONT, 11))
         self.emotion_confidence.setAlignment(Qt.AlignCenter)
         self.emotion_confidence.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         emotion_layout.addWidget(self.emotion_value)
@@ -184,11 +194,11 @@ class ResultCardWidget(QFrame):
         self.stability_frame = self._make_sub_card("情绪稳定度 (0-10)")
         stability_layout = QVBoxLayout(self.stability_frame)
         self.stability_value = QLabel("--")
-        self.stability_value.setFont(QFont("Consolas", 32, QFont.Bold))
+        self.stability_value.setFont(QFont(MONO_FONT, 36, QFont.Bold))
         self.stability_value.setAlignment(Qt.AlignCenter)
         self.stability_value.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         self.stability_level = QLabel("")
-        self.stability_level.setFont(QFont("Microsoft YaHei", 10))
+        self.stability_level.setFont(QFont(UI_FONT, 11))
         self.stability_level.setAlignment(Qt.AlignCenter)
         self.stability_level.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         stability_layout.addWidget(self.stability_value)
@@ -199,7 +209,7 @@ class ResultCardWidget(QFrame):
 
         # --- 第二行：VAD 维度 ---
         vad_label = QLabel("情感维度指标（从离散概率估计）")
-        vad_label.setFont(QFont("Microsoft YaHei", 10))
+        vad_label.setFont(QFont(UI_FONT, 11))
         vad_label.setStyleSheet(f"color: {_TEXT_SECONDARY};")
         layout.addWidget(vad_label)
 
@@ -216,7 +226,7 @@ class ResultCardWidget(QFrame):
 
         # --- 第三行：稳定度分项 ---
         factors_label = QLabel("稳定度因子分解（权重来源：专家设定）")
-        factors_label.setFont(QFont("Microsoft YaHei", 10))
+        factors_label.setFont(QFont(UI_FONT, 11))
         factors_label.setStyleSheet(f"color: {_TEXT_SECONDARY};")
         layout.addWidget(factors_label)
 
@@ -229,13 +239,13 @@ class ResultCardWidget(QFrame):
             flay.setSpacing(4)
             # 因子名称标签
             name_lbl = QLabel(name)
-            name_lbl.setFont(QFont("Microsoft YaHei", 10))
+            name_lbl.setFont(QFont(UI_FONT, 11))
             name_lbl.setAlignment(Qt.AlignCenter)
             name_lbl.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
             flay.addWidget(name_lbl)
             # 因子数值
             val = QLabel("--")
-            val.setFont(QFont("Consolas", 16, QFont.Bold))
+            val.setFont(QFont(MONO_FONT, 18, QFont.Bold))
             val.setAlignment(Qt.AlignCenter)
             val.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
             flay.addWidget(val)
@@ -252,16 +262,16 @@ class ResultCardWidget(QFrame):
 
         # --- 音频质量标签 ---
         self.quality_label = QLabel("")
-        self.quality_label.setFont(QFont("Microsoft YaHei", 9))
+        self.quality_label.setFont(QFont(UI_FONT, 10))
         self.quality_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; padding: 2px 0;")
         self.quality_label.hide()
         layout.addWidget(self.quality_label)
 
         # --- 可靠性标签 ---
         self.reliability_label = QLabel("")
-        self.reliability_label.setFont(QFont("Microsoft YaHei", 10))
+        self.reliability_label.setFont(QFont(UI_FONT, 11))
         self.reliability_label.setAlignment(Qt.AlignCenter)
-        self.reliability_label.setMinimumHeight(28)
+        self.reliability_label.setMinimumHeight(32)
         self.reliability_label.hide()
         layout.addWidget(self.reliability_label)
 

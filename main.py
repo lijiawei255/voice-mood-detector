@@ -76,8 +76,9 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("语音情绪识别系统")
     app.setOrganizationName("VoiceMoodDetector")
-    # 设置全局字体，优先使用微软雅黑以保证中文显示效果
-    app.setFont(QFont("Microsoft YaHei", 10))
+    # 设置全局字体，优先使用微软雅黑 UI（字形更舒展）以保证中文显示效果
+    from gui_widgets.fonts import UI_FONT
+    app.setFont(QFont(UI_FONT, 11))
 
     # 创建并显示主窗口（默认最大化）
     window = MainWindow()

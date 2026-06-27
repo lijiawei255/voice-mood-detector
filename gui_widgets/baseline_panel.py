@@ -16,6 +16,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 
+from .fonts import UI_FONT
+
 
 # 极简主义色板常量
 _TEXT_PRIMARY = "#1D1D1F"
@@ -33,7 +35,7 @@ class BaselinePanel(QGroupBox):
 
     def __init__(self, parent=None):
         super().__init__("个人基线管理", parent)
-        self.setFont(QFont("Microsoft YaHei", 11, QFont.Medium))
+        self.setFont(QFont(UI_FONT, 12, QFont.Medium))
         self.setObjectName("baselineGroup")
         self.setStyleSheet(f"""
             QGroupBox#baselineGroup {{
@@ -59,7 +61,7 @@ class BaselinePanel(QGroupBox):
 
         # 状态指示
         self.status_label = QLabel("基线状态：未建立")
-        self.status_label.setFont(QFont("Microsoft YaHei", 11))
+        self.status_label.setFont(QFont(UI_FONT, 12))
         self.status_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         layout.addWidget(self.status_label)
 
@@ -68,7 +70,7 @@ class BaselinePanel(QGroupBox):
             "平静状态下的语音样本。首次建立后，后续评估将"
             "同时显示绝对分数和相对基线偏移。"
         )
-        self.info_label.setFont(QFont("Microsoft YaHei", 10))
+        self.info_label.setFont(QFont(UI_FONT, 11))
         self.info_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         self.info_label.setWordWrap(True)
         layout.addWidget(self.info_label)
@@ -87,7 +89,7 @@ class BaselinePanel(QGroupBox):
                 background-color: {_BG_TERTIARY};
                 text-align: center;
                 color: {_TEXT_PRIMARY};
-                font-size: 10pt;
+                font-size: 11pt;
             }}
             QProgressBar::chunk {{
                 background-color: {_ACCENT};
@@ -101,7 +103,7 @@ class BaselinePanel(QGroupBox):
         btn_layout.setSpacing(10)
 
         self.collect_btn = QPushButton("采集基线样本")
-        self.collect_btn.setFont(QFont("Microsoft YaHei", 10))
+        self.collect_btn.setFont(QFont(UI_FONT, 11))
         self.collect_btn.setMinimumHeight(34)
         self.collect_btn.setCursor(Qt.PointingHandCursor)
         self.collect_btn.setStyleSheet(_primary_btn_style())
@@ -109,7 +111,7 @@ class BaselinePanel(QGroupBox):
         btn_layout.addWidget(self.collect_btn)
 
         self.reset_btn = QPushButton("重置基线")
-        self.reset_btn.setFont(QFont("Microsoft YaHei", 10))
+        self.reset_btn.setFont(QFont(UI_FONT, 11))
         self.reset_btn.setMinimumHeight(34)
         self.reset_btn.setCursor(Qt.PointingHandCursor)
         self.reset_btn.setStyleSheet(_ghost_btn_style())
@@ -121,7 +123,7 @@ class BaselinePanel(QGroupBox):
 
         # 偏移显示
         self.deviation_label = QLabel("")
-        self.deviation_label.setFont(QFont("Microsoft YaHei", 10))
+        self.deviation_label.setFont(QFont(UI_FONT, 11))
         self.deviation_label.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         self.deviation_label.setWordWrap(True)
         self.deviation_label.hide()

@@ -18,6 +18,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 
+from .fonts import UI_FONT
+
 try:
     from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
     from matplotlib.figure import Figure
@@ -103,11 +105,11 @@ class ResearchRadarChart(QWidget):
 
         # 标签
         self.ax.set_yticks(y_pos)
-        self.ax.set_yticklabels(categories, fontsize=9, color=_TEXT_PRIMARY)
+        self.ax.set_yticklabels(categories, fontsize=10, color=_TEXT_PRIMARY)
         self.ax.set_xlim(-1.05, 1.05)
         self.ax.set_xticks([-1.0, -0.5, 0, 0.5, 1.0])
-        self.ax.set_xticklabels(['-1.0', '-0.5', '0', '0.5', '1.0'], fontsize=8, color=_TEXT_SECONDARY)
-        self.ax.set_xlabel("", fontsize=9, color=_TEXT_SECONDARY)
+        self.ax.set_xticklabels(['-1.0', '-0.5', '0', '0.5', '1.0'], fontsize=9, color=_TEXT_SECONDARY)
+        self.ax.set_xlabel("", fontsize=10, color=_TEXT_SECONDARY)
 
         # 数值标注
         for i, (v, c) in enumerate(zip(values, categories)):
@@ -118,7 +120,7 @@ class ResearchRadarChart(QWidget):
                 x_pos = v - 0.04
                 ha = 'right'
             self.ax.text(x_pos, i, f'{v:+.2f}', va='center', ha=ha,
-                         fontsize=8, color=_TEXT_PRIMARY, zorder=4)
+                         fontsize=9, color=_TEXT_PRIMARY, zorder=4)
 
         # 极简主义样式：隐藏顶/右边框，左侧细线
         self.ax.set_facecolor(_BG)
@@ -132,7 +134,7 @@ class ResearchRadarChart(QWidget):
         self.ax.grid(True, axis='x', alpha=0.5, linestyle='-', linewidth=0.6, color=_BORDER, zorder=1)
 
         # 标题
-        self.ax.set_title("情感维度指标", fontsize=11, color=_TEXT_PRIMARY, loc='left', pad=10)
+        self.ax.set_title("情感维度指标", fontsize=12, color=_TEXT_PRIMARY, loc='left', pad=10)
 
         self.figure.tight_layout(pad=1.5)
         self.canvas.draw()
@@ -151,12 +153,12 @@ class ExportToolbar(QWidget):
         layout.setSpacing(10)
 
         title = QLabel("导出研究数据")
-        title.setFont(QFont("Microsoft YaHei", 11, QFont.Medium))
+        title.setFont(QFont(UI_FONT, 12, QFont.Medium))
         title.setStyleSheet(f"color: {_TEXT_PRIMARY};")
         layout.addWidget(title)
 
         csv_btn = QPushButton("导出 CSV (Excel/SPSS)")
-        csv_btn.setFont(QFont("Microsoft YaHei", 10))
+        csv_btn.setFont(QFont(UI_FONT, 11))
         csv_btn.setMinimumHeight(36)
         csv_btn.setCursor(Qt.PointingHandCursor)
         csv_btn.setToolTip("导出为 UTF-8 CSV 格式，可在 Excel/SPSS 中直接打开\n包含所有数值型指标和质量评估数据")
@@ -177,7 +179,7 @@ class ExportToolbar(QWidget):
         layout.addWidget(csv_btn)
 
         json_btn = QPushButton("导出 JSON (完整数据)")
-        json_btn.setFont(QFont("Microsoft YaHei", 10))
+        json_btn.setFont(QFont(UI_FONT, 11))
         json_btn.setMinimumHeight(36)
         json_btn.setCursor(Qt.PointingHandCursor)
         json_btn.setToolTip("导出为 JSON 格式，包含原始模型输出、完整概率分布等全部字段\n适合科研复算和深度分析")

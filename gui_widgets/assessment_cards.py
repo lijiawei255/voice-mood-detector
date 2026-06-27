@@ -20,6 +20,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
+from .fonts import UI_FONT, MONO_FONT
+
 
 # 极简主义色板常量
 _BG_SECONDARY = "#F5F5F7"
@@ -59,20 +61,20 @@ class MetricRow(QWidget):
         layout.setSpacing(8)
 
         self.label_lbl = QLabel(label)
-        self.label_lbl.setFont(QFont("Microsoft YaHei", 10))
+        self.label_lbl.setFont(QFont(UI_FONT, 11))
         self.label_lbl.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         layout.addWidget(self.label_lbl)
 
         layout.addStretch()
 
         self.value_lbl = QLabel(value)
-        self.value_lbl.setFont(QFont("Consolas", 11, QFont.Bold))
+        self.value_lbl.setFont(QFont(MONO_FONT, 12, QFont.Bold))
         self.value_lbl.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(self.value_lbl)
 
         if unit:
             self.unit_lbl = QLabel(unit)
-            self.unit_lbl.setFont(QFont("Microsoft YaHei", 9))
+            self.unit_lbl.setFont(QFont(UI_FONT, 10))
             self.unit_lbl.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
             layout.addWidget(self.unit_lbl)
         else:
@@ -96,7 +98,7 @@ class AcousticFeatureCard(_MinimalCard):
         layout.setSpacing(8)
 
         title = QLabel("声学特征")
-        title.setFont(QFont("Microsoft YaHei", 12, QFont.Medium))
+        title.setFont(QFont(UI_FONT, 13, QFont.Medium))
         title.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(title)
 
@@ -113,7 +115,7 @@ class AcousticFeatureCard(_MinimalCard):
             layout.addWidget(row)
 
         note = QLabel("声带特征需要安装 praat-parselmouth 以获得专业级精度")
-        note.setFont(QFont("Microsoft YaHei", 9))
+        note.setFont(QFont(UI_FONT, 10))
         note.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -146,7 +148,7 @@ class PsychologicalIndicatorCard(_MinimalCard):
         layout.setSpacing(8)
 
         title = QLabel("心理状态指标")
-        title.setFont(QFont("Microsoft YaHei", 12, QFont.Medium))
+        title.setFont(QFont(UI_FONT, 13, QFont.Medium))
         title.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(title)
 
@@ -161,7 +163,7 @@ class PsychologicalIndicatorCard(_MinimalCard):
             layout.addWidget(row)
 
         note = QLabel("基于声学特征与 VAD 维度的估计值，非临床诊断")
-        note.setFont(QFont("Microsoft YaHei", 9))
+        note.setFont(QFont(UI_FONT, 10))
         note.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -192,19 +194,19 @@ class ReliabilityBadge(_MinimalCard):
         layout.setSpacing(8)
 
         title = QLabel("可靠性评估")
-        title.setFont(QFont("Microsoft YaHei", 12, QFont.Medium))
+        title.setFont(QFont(UI_FONT, 13, QFont.Medium))
         title.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(title)
 
         self.level_lbl = QLabel("--")
-        self.level_lbl.setFont(QFont("Consolas", 24, QFont.Bold))
+        self.level_lbl.setFont(QFont(MONO_FONT, 28, QFont.Bold))
         self.level_lbl.setAlignment(Qt.AlignCenter)
         self.level_lbl.setMinimumHeight(40)
         self.level_lbl.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(self.level_lbl)
 
         self.detail_lbl = QLabel("")
-        self.detail_lbl.setFont(QFont("Microsoft YaHei", 10))
+        self.detail_lbl.setFont(QFont(UI_FONT, 11))
         self.detail_lbl.setAlignment(Qt.AlignCenter)
         self.detail_lbl.setWordWrap(True)
         self.detail_lbl.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
@@ -250,18 +252,18 @@ class BaselineDeviationCard(_MinimalCard):
         layout.setSpacing(8)
 
         title = QLabel("相对个人基线")
-        title.setFont(QFont("Microsoft YaHei", 12, QFont.Medium))
+        title.setFont(QFont(UI_FONT, 13, QFont.Medium))
         title.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(title)
 
         self.status_lbl = QLabel("基线尚未建立")
-        self.status_lbl.setFont(QFont("Microsoft YaHei", 11))
+        self.status_lbl.setFont(QFont(UI_FONT, 12))
         self.status_lbl.setAlignment(Qt.AlignCenter)
         self.status_lbl.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         layout.addWidget(self.status_lbl)
 
         self.summary_lbl = QLabel("")
-        self.summary_lbl.setFont(QFont("Microsoft YaHei", 10))
+        self.summary_lbl.setFont(QFont(UI_FONT, 11))
         self.summary_lbl.setWordWrap(True)
         self.summary_lbl.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         layout.addWidget(self.summary_lbl)

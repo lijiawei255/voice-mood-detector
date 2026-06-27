@@ -61,6 +61,7 @@ from gui_widgets.threads import RecordingThread, AnalysisThread
 from gui_widgets.toast import ToastNotification, ToastManager
 from gui_widgets.baseline_panel import BaselinePanel
 from gui_widgets.stats_panel import StatsPanel
+from gui_widgets.fonts import UI_FONT, MONO_FONT
 from research_session import ResearchSession
 from app_paths import (
     get_recordings_dir, get_log_file, get_temp_dir,
@@ -150,7 +151,7 @@ class WelcomeDialog(QDialog):
         layout.setContentsMargins(30, 30, 30, 30)
 
         title_label = QLabel("欢迎使用语音情绪识别系统")
-        title_label.setFont(QFont("Microsoft YaHei", 20, QFont.Medium))
+        title_label.setFont(QFont(UI_FONT, 22, QFont.Medium))
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("color: #1D1D1F; margin-bottom: 10px;")
         layout.addWidget(title_label)
@@ -174,7 +175,7 @@ class WelcomeDialog(QDialog):
 
         if self.is_first_run:
             model_group = QGroupBox("选择AI模型")
-            model_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
+            model_group.setFont(QFont(UI_FONT, 13, QFont.Bold))
             model_layout = QVBoxLayout(model_group)
             model_layout.setContentsMargins(20, 25, 20, 20)
             model_text = QLabel(
@@ -193,11 +194,11 @@ class WelcomeDialog(QDialog):
         
             # 模型选择 ComboBox
             model_select_label = QLabel("选择模型：")
-            model_select_label.setFont(QFont("Microsoft YaHei", 11))
+            model_select_label.setFont(QFont(UI_FONT, 12))
             model_layout.addWidget(model_select_label)
         
             self.model_combo = QComboBox()
-            self.model_combo.setFont(QFont("Microsoft YaHei", 11))
+            self.model_combo.setFont(QFont(UI_FONT, 12))
             self.model_combo.setMinimumHeight(40)
             self.model_combo.addItem("emotion2vec_plus_large — 大型模型 (~1GB) 精度最高【推荐】", "emotion2vec_plus_large")
             self.model_combo.addItem("emotion2vec_plus_base — 基础模型 (~500MB) 速度与精度均衡", "emotion2vec_plus_base")
@@ -231,7 +232,7 @@ class WelcomeDialog(QDialog):
             content_layout.addWidget(model_group)
 
         tech_group = QGroupBox("技术栈")
-        tech_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
+        tech_group.setFont(QFont(UI_FONT, 13, QFont.Bold))
         tech_layout = QVBoxLayout(tech_group)
         tech_layout.setContentsMargins(20, 25, 20, 20)
         tech_text = QLabel(
@@ -249,7 +250,7 @@ class WelcomeDialog(QDialog):
         content_layout.addWidget(tech_group)
 
         usage_group = QGroupBox("使用方法")
-        usage_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
+        usage_group.setFont(QFont(UI_FONT, 13, QFont.Bold))
         usage_layout = QVBoxLayout(usage_group)
         usage_layout.setContentsMargins(20, 25, 20, 20)
         usage_text = QLabel(
@@ -268,7 +269,7 @@ class WelcomeDialog(QDialog):
         content_layout.addWidget(usage_group)
 
         tips_group = QGroupBox("数据管理")
-        tips_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
+        tips_group.setFont(QFont(UI_FONT, 13, QFont.Bold))
         tips_layout = QVBoxLayout(tips_group)
         tips_layout.setContentsMargins(20, 25, 20, 20)
         tips_text = QLabel(
@@ -286,7 +287,7 @@ class WelcomeDialog(QDialog):
         content_layout.addWidget(tips_group)
 
         disclaimer_group = QGroupBox("重要声明")
-        disclaimer_group.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
+        disclaimer_group.setFont(QFont(UI_FONT, 13, QFont.Bold))
         disclaimer_layout = QVBoxLayout(disclaimer_group)
         disclaimer_layout.setContentsMargins(20, 25, 20, 20)
         disclaimer_text = QLabel(
@@ -310,7 +311,7 @@ class WelcomeDialog(QDialog):
 
         if self.is_first_run:
             start_btn = QPushButton("开始使用（下载模型）")
-            start_btn.setFont(QFont("Microsoft YaHei", 12))
+            start_btn.setFont(QFont(UI_FONT, 13))
             start_btn.setMinimumHeight(44)
             start_btn.setMinimumWidth(240)
             start_btn.setCursor(Qt.PointingHandCursor)
@@ -333,7 +334,7 @@ class WelcomeDialog(QDialog):
             btn_layout.addWidget(start_btn)
         else:
             close_btn = QPushButton("知道了")
-            close_btn.setFont(QFont("Microsoft YaHei", 11))
+            close_btn.setFont(QFont(UI_FONT, 12))
             close_btn.setMinimumHeight(40)
             close_btn.setMinimumWidth(140)
             close_btn.setCursor(Qt.PointingHandCursor)
@@ -390,13 +391,13 @@ class ModelSwitchDialog(QDialog):
         layout.setContentsMargins(25, 25, 25, 25)
 
         title_label = QLabel("选择情绪识别模型")
-        title_label.setFont(QFont("Microsoft YaHei", 15, QFont.Medium))
+        title_label.setFont(QFont(UI_FONT, 17, QFont.Medium))
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("color: #1D1D1F; margin-bottom: 5px;")
         layout.addWidget(title_label)
 
         desc_label = QLabel("选择不同的模型会影响识别精度和运行速度，切换后需要重新加载模型。")
-        desc_label.setFont(QFont("Microsoft YaHei", 10))
+        desc_label.setFont(QFont(UI_FONT, 11))
         desc_label.setStyleSheet("color: #86868B;")
         desc_label.setWordWrap(True)
         layout.addWidget(desc_label)
@@ -423,7 +424,7 @@ class ModelSwitchDialog(QDialog):
             status_text = "当前使用" if is_current else ("已下载" if downloaded else "需要下载")
             status_color = "#1A73E8" if is_current else ("#86868B" if downloaded else "#EA4335")
             radio.setText(f"{display}  ·  大小: {size}  ·  {desc}")
-            radio.setFont(QFont("Microsoft YaHei", 11))
+            radio.setFont(QFont(UI_FONT, 12))
             radio.setMinimumHeight(48)
             radio.setStyleSheet(f"""
                 QRadioButton {{
@@ -442,7 +443,7 @@ class ModelSwitchDialog(QDialog):
 
             # 状态标签
             status_label = QLabel(f"    {status_text}")
-            status_label.setFont(QFont("Microsoft YaHei", 9))
+            status_label.setFont(QFont(UI_FONT, 11))
             status_label.setStyleSheet(f"color: {status_color}; margin-left: 30px; margin-top: -5px;")
             layout.addWidget(status_label)
 
@@ -453,7 +454,7 @@ class ModelSwitchDialog(QDialog):
         btn_layout.addStretch()
 
         cancel_btn = QPushButton("取消")
-        cancel_btn.setFont(QFont("Microsoft YaHei", 10))
+        cancel_btn.setFont(QFont(UI_FONT, 11))
         cancel_btn.setMinimumHeight(36)
         cancel_btn.setMinimumWidth(100)
         cancel_btn.setCursor(Qt.PointingHandCursor)
@@ -473,7 +474,7 @@ class ModelSwitchDialog(QDialog):
         btn_layout.addWidget(cancel_btn)
 
         self.confirm_btn = QPushButton("确认切换")
-        self.confirm_btn.setFont(QFont("Microsoft YaHei", 10))
+        self.confirm_btn.setFont(QFont(UI_FONT, 11))
         self.confirm_btn.setMinimumHeight(36)
         self.confirm_btn.setMinimumWidth(120)
         self.confirm_btn.setCursor(Qt.PointingHandCursor)
@@ -546,7 +547,7 @@ class DataManagerDialog(QDialog):
         layout.setContentsMargins(5, 5, 5, 5)
 
         info_group = QGroupBox("数据存储位置（便携模式）")
-        info_group.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
+        info_group.setFont(QFont(UI_FONT, 12, QFont.Bold))
         info_layout = QVBoxLayout(info_group)
 
         self.path_info = QLabel("")
@@ -561,20 +562,20 @@ class DataManagerDialog(QDialog):
         self.refresh_path_info()
 
         self.stats_label = QLabel("")
-        self.stats_label.setFont(QFont("Microsoft YaHei", 10))
+        self.stats_label.setFont(QFont(UI_FONT, 11))
         self.stats_label.setWordWrap(True)
         self.stats_label.setTextFormat(Qt.RichText)
         self.stats_label.setStyleSheet("padding: 12px 16px; background-color: #F5F5F7; border: 1px solid #D2D2D7; border-radius: 6px;")
         layout.addWidget(self.stats_label)
 
         actions_group = QGroupBox("数据清理操作")
-        actions_group.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
+        actions_group.setFont(QFont(UI_FONT, 12, QFont.Bold))
         actions_layout = QVBoxLayout(actions_group)
         actions_layout.setSpacing(10)
         actions_layout.setContentsMargins(15, 25, 15, 15)
 
         del_all_btn = QPushButton("清空所有历史记录和录音")
-        del_all_btn.setFont(QFont("Microsoft YaHei", 10))
+        del_all_btn.setFont(QFont(UI_FONT, 11))
         del_all_btn.setMinimumHeight(38)
         del_all_btn.setObjectName("dangerBtn")
         del_all_btn.setCursor(Qt.PointingHandCursor)
@@ -582,7 +583,7 @@ class DataManagerDialog(QDialog):
         actions_layout.addWidget(del_all_btn)
 
         clear_all_btn = QPushButton("一键清理系统垃圾")
-        clear_all_btn.setFont(QFont("Microsoft YaHei", 10))
+        clear_all_btn.setFont(QFont(UI_FONT, 11))
         clear_all_btn.setMinimumHeight(38)
         clear_all_btn.setCursor(Qt.PointingHandCursor)
         clear_all_btn.setObjectName("ghostBtn")
@@ -591,7 +592,7 @@ class DataManagerDialog(QDialog):
         actions_layout.addWidget(clear_all_btn)
 
         open_folder_btn = QPushButton("打开数据文件夹")
-        open_folder_btn.setFont(QFont("Microsoft YaHei", 10))
+        open_folder_btn.setFont(QFont(UI_FONT, 11))
         open_folder_btn.setMinimumHeight(38)
         open_folder_btn.setCursor(Qt.PointingHandCursor)
         open_folder_btn.setObjectName("ghostBtn")
@@ -605,7 +606,7 @@ class DataManagerDialog(QDialog):
         outer_layout.addWidget(scroll_area, 1)
 
         self.dm_refresh_btn = QPushButton("刷新统计")
-        self.dm_refresh_btn.setFont(QFont("Microsoft YaHei", 10))
+        self.dm_refresh_btn.setFont(QFont(UI_FONT, 11))
         self.dm_refresh_btn.setMinimumHeight(36)
         self.dm_refresh_btn.setMinimumWidth(110)
         self.dm_refresh_btn.setCursor(Qt.PointingHandCursor)
@@ -613,7 +614,7 @@ class DataManagerDialog(QDialog):
         self.dm_refresh_btn.clicked.connect(self._on_dm_refresh_clicked)
 
         close_btn = QPushButton("关闭")
-        close_btn.setFont(QFont("Microsoft YaHei", 10))
+        close_btn.setFont(QFont(UI_FONT, 11))
         close_btn.setMinimumHeight(36)
         close_btn.setMinimumWidth(110)
         close_btn.setCursor(Qt.PointingHandCursor)
@@ -1003,14 +1004,14 @@ class MainWindow(QMainWindow):
         header_layout.setSpacing(16)
 
         title_label = QLabel("语音情绪识别系统")
-        title_label.setFont(QFont("Microsoft YaHei", 16, QFont.Medium))
+        title_label.setFont(QFont(UI_FONT, 18, QFont.Medium))
         title_label.setObjectName("headerTitle")
         header_layout.addWidget(title_label)
         header_layout.addStretch()
 
         # 模型切换按钮 — ghost 风格
         self.model_switch_btn = QPushButton("切换模型")
-        self.model_switch_btn.setFont(QFont("Microsoft YaHei", 10))
+        self.model_switch_btn.setFont(QFont(UI_FONT, 11))
         self.model_switch_btn.setCursor(Qt.PointingHandCursor)
         self.model_switch_btn.setObjectName("ghostBtn")
         self.model_switch_btn.clicked.connect(self.show_model_switch_dialog)
@@ -1018,14 +1019,14 @@ class MainWindow(QMainWindow):
 
         # 状态标签 — 圆角 pill
         self.status_label = QLabel("正在启动...")
-        self.status_label.setFont(QFont("Microsoft YaHei", 10))
+        self.status_label.setFont(QFont(UI_FONT, 11))
         self.status_label.setObjectName("statusLoading")
         header_layout.addWidget(self.status_label)
 
         main_layout.addWidget(header_frame)
 
         self.tab_widget = QTabWidget()
-        self.tab_widget.setFont(QFont("Microsoft YaHei", 11))
+        self.tab_widget.setFont(QFont(UI_FONT, 12))
         self.tab_widget.setObjectName("mainTab")
 
         self.create_realtime_tab()
@@ -1146,14 +1147,14 @@ class MainWindow(QMainWindow):
         left_layout.setContentsMargins(5, 5, 5, 5)
 
         control_group = QGroupBox("录音控制")
-        control_group.setFont(QFont("Microsoft YaHei", 11, QFont.Medium))
+        control_group.setFont(QFont(UI_FONT, 12, QFont.Medium))
         control_group.setObjectName("controlGroup")
         control_layout = QVBoxLayout(control_group)
         control_layout.setSpacing(14)
         control_layout.setContentsMargins(20, 24, 20, 20)
 
         self.record_btn = QPushButton("模型加载中...")
-        self.record_btn.setFont(QFont("Microsoft YaHei", 14, QFont.Medium))
+        self.record_btn.setFont(QFont(UI_FONT, 16, QFont.Medium))
         self.record_btn.setMinimumHeight(56)
         self.record_btn.setObjectName("recordBtn")
         self.record_btn.clicked.connect(self.toggle_recording)
@@ -1165,15 +1166,15 @@ class MainWindow(QMainWindow):
         mode_layout = QHBoxLayout()
         mode_layout.setSpacing(16)
         mode_label = QLabel("评估模式")
-        mode_label.setFont(QFont("Microsoft YaHei", 10))
+        mode_label.setFont(QFont(UI_FONT, 11))
         mode_label.setStyleSheet("color: #86868B;")
         mode_layout.addWidget(mode_label)
 
         self.mode_quick = QRadioButton("快速检测")
-        self.mode_quick.setFont(QFont("Microsoft YaHei", 10))
+        self.mode_quick.setFont(QFont(UI_FONT, 11))
         self.mode_quick.setChecked(True)
         self.mode_research = QRadioButton("科研评估")
-        self.mode_research.setFont(QFont("Microsoft YaHei", 10))
+        self.mode_research.setFont(QFont(UI_FONT, 11))
         self.mode_research.setToolTip(
             "科研评估模式：统一提示语 + 质量门控 + 3段采样 + 双模型验证"
         )
@@ -1193,24 +1194,24 @@ class MainWindow(QMainWindow):
         info_grid.setColumnStretch(1, 3)
 
         duration_title = QLabel("录音时长")
-        duration_title.setFont(QFont("Microsoft YaHei", 10))
+        duration_title.setFont(QFont(UI_FONT, 11))
         duration_title.setStyleSheet("color: #86868B;")
         info_grid.addWidget(duration_title, 0, 0)
 
         self.duration_display = QLabel("00:00")
-        self.duration_display.setFont(QFont("Consolas", 24, QFont.Bold))
-        self.duration_display.setMinimumWidth(120)
+        self.duration_display.setFont(QFont(MONO_FONT, 26, QFont.Bold))
+        self.duration_display.setMinimumWidth(140)
         self.duration_display.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.duration_display.setObjectName("durationLabel")
         info_grid.addWidget(self.duration_display, 0, 1)
 
         # P0 新增：录音质量实时反馈
         quality_title = QLabel("录音质量")
-        quality_title.setFont(QFont("Microsoft YaHei", 10))
+        quality_title.setFont(QFont(UI_FONT, 11))
         quality_title.setStyleSheet("color: #86868B;")
         info_grid.addWidget(quality_title, 1, 0)
         self.quality_feedback = QLabel("等待录音...")
-        self.quality_feedback.setFont(QFont("Microsoft YaHei", 10))
+        self.quality_feedback.setFont(QFont(UI_FONT, 11))
         self.quality_feedback.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.quality_feedback.setMinimumHeight(24)
         self.quality_feedback.setStyleSheet(
@@ -1219,7 +1220,7 @@ class MainWindow(QMainWindow):
         info_grid.addWidget(self.quality_feedback, 1, 1)
 
         progress_title = QLabel("处理进度")
-        progress_title.setFont(QFont("Microsoft YaHei", 10))
+        progress_title.setFont(QFont(UI_FONT, 11))
         progress_title.setStyleSheet("color: #86868B;")
         info_grid.addWidget(progress_title, 2, 0)
 
@@ -1228,15 +1229,15 @@ class MainWindow(QMainWindow):
         self.record_progress.setValue(0)
         self.record_progress.setObjectName("recordProgress")
         self.record_progress.setTextVisible(False)
-        self.record_progress.setMinimumHeight(8)
-        self.record_progress.setMaximumHeight(10)
+        self.record_progress.setMinimumHeight(10)
+        self.record_progress.setMaximumHeight(12)
         info_grid.addWidget(self.record_progress, 2, 1)
 
         control_layout.addLayout(info_grid)
         left_layout.addWidget(control_group)
 
         result_group = QGroupBox("检测结果")
-        result_group.setFont(QFont("Microsoft YaHei", 11, QFont.Medium))
+        result_group.setFont(QFont(UI_FONT, 12, QFont.Medium))
         result_group.setObjectName("resultGroup")
         self.result_group = result_group
         result_layout = QVBoxLayout(result_group)
@@ -1293,13 +1294,13 @@ class MainWindow(QMainWindow):
 
         # 分数说明
         stability_hint = QLabel("分数越低越稳定 · 0分最稳定 · 10分波动最大")
-        stability_hint.setFont(QFont("Microsoft YaHei", 10))
+        stability_hint.setFont(QFont(UI_FONT, 11))
         stability_hint.setAlignment(Qt.AlignCenter)
         stability_hint.setStyleSheet("color: #86868B; padding: 6px 0;")
         result_layout.addWidget(stability_hint)
 
         self.warning_label = QLabel("")
-        self.warning_label.setFont(QFont("Microsoft YaHei", 11))
+        self.warning_label.setFont(QFont(UI_FONT, 12))
         self.warning_label.setAlignment(Qt.AlignCenter)
         self.warning_label.setObjectName("warningLabel")
         self.warning_label.setMinimumHeight(44)
@@ -1308,7 +1309,7 @@ class MainWindow(QMainWindow):
         result_layout.addWidget(self.warning_label)
 
         prob_title = QLabel("情绪概率分布")
-        prob_title.setFont(QFont("Microsoft YaHei", 12, QFont.Medium))
+        prob_title.setFont(QFont(UI_FONT, 13, QFont.Medium))
         prob_title.setStyleSheet("color: #1D1D1F; padding: 4px 0;")
         result_layout.addWidget(prob_title)
 
@@ -1320,9 +1321,9 @@ class MainWindow(QMainWindow):
             bar_row.setSpacing(12)
 
             label = QLabel(emotion)
-            label.setFont(QFont("Microsoft YaHei", 10))
-            label.setMinimumWidth(50)
-            label.setMaximumWidth(50)
+            label.setFont(QFont(UI_FONT, 11))
+            label.setMinimumWidth(64)
+            label.setMaximumWidth(64)
             label.setStyleSheet("color: #1D1D1F;")
             bar_row.addWidget(label)
 
@@ -1331,15 +1332,15 @@ class MainWindow(QMainWindow):
             bar.setValue(0)
             bar.setTextVisible(False)
             bar.setObjectName(f"probBar_{emotion}")
-            bar.setMinimumHeight(8)
-            bar.setMaximumHeight(8)
+            bar.setMinimumHeight(10)
+            bar.setMaximumHeight(10)
             self.prob_bars[emotion] = bar
             bar_row.addWidget(bar, 1)
 
             pct_label = QLabel("—")
-            pct_label.setFont(QFont("Microsoft YaHei", 10))
-            pct_label.setMinimumWidth(50)
-            pct_label.setMaximumWidth(50)
+            pct_label.setFont(QFont(UI_FONT, 11))
+            pct_label.setMinimumWidth(64)
+            pct_label.setMaximumWidth(64)
             pct_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             pct_label.setStyleSheet("color: #86868B;")
             pct_label.setObjectName(f"probLabel_{emotion}")
@@ -1371,7 +1372,7 @@ class MainWindow(QMainWindow):
         guide_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
         quick_guide = QGroupBox("快速指南")
-        quick_guide.setFont(QFont("Microsoft YaHei", 11, QFont.Medium))
+        quick_guide.setFont(QFont(UI_FONT, 12, QFont.Medium))
         quick_guide.setObjectName("guideGroup")
         guide_layout = QVBoxLayout(quick_guide)
         guide_layout.setContentsMargins(16, 24, 16, 16)
@@ -1379,12 +1380,12 @@ class MainWindow(QMainWindow):
 
         # 使用流程 — 极简编号列表
         steps_title = QLabel("使用流程")
-        steps_title.setFont(QFont("Microsoft YaHei", 10, QFont.Medium))
+        steps_title.setFont(QFont(UI_FONT, 11, QFont.Medium))
         steps_title.setStyleSheet("color: #1D1D1F; padding: 4px 0;")
         guide_layout.addWidget(steps_title)
 
         steps_text = QLabel(
-            "<div style='line-height: 1.9; font-size: 10pt; color: #86868B;'>"
+            "<div style='line-height: 1.9; font-size: 11pt; color: #86868B;'>"
             "1. 等待模型加载完成<br>"
             "2. 点击「开始录音」按钮<br>"
             "3. 说出您的感受（3-30秒）<br>"
@@ -1398,12 +1399,12 @@ class MainWindow(QMainWindow):
 
         # 功能说明
         features_title = QLabel("功能说明")
-        features_title.setFont(QFont("Microsoft YaHei", 10, QFont.Medium))
+        features_title.setFont(QFont(UI_FONT, 11, QFont.Medium))
         features_title.setStyleSheet("color: #1D1D1F; padding: 4px 0; margin-top: 8px;")
         guide_layout.addWidget(features_title)
 
         features_text = QLabel(
-            "<div style='line-height: 1.7; font-size: 10pt; color: #86868B;'>"
+            "<div style='line-height: 1.7; font-size: 11pt; color: #86868B;'>"
             "· <b style='color:#1D1D1F;'>多模型支持：</b>可切换 Large/Base/Seed 三种模型<br>"
             "· <b style='color:#1D1D1F;'>7种情绪识别：</b>平静、开心、惊讶、悲伤、愤怒、恐惧、厌恶<br>"
             "· <b style='color:#1D1D1F;'>复合情绪检测：</b>自动识别焦虑、挫败等复合情绪<br>"
@@ -1420,7 +1421,7 @@ class MainWindow(QMainWindow):
         # 提示
         tip_label = QLabel(
             "<div style='line-height: 1.6; padding: 10px 12px; margin-top: 8px; "
-            "font-size: 10pt; color: #1D1D1F; background: #F5F5F7; "
+            "font-size: 11pt; color: #1D1D1F; background: #F5F5F7; "
             "border: 1px solid #D2D2D7; border-radius: 6px;'>"
             "<b>小贴士：</b>在安静的环境下录音，效果会更好"
             "</div>"
@@ -1457,7 +1458,7 @@ class MainWindow(QMainWindow):
         history_btn_layout.setSpacing(10)
 
         self.history_refresh_btn = QPushButton("刷新列表")
-        self.history_refresh_btn.setFont(QFont("Microsoft YaHei", 10))
+        self.history_refresh_btn.setFont(QFont(UI_FONT, 11))
         self.history_refresh_btn.setMinimumHeight(34)
         self.history_refresh_btn.setMinimumWidth(110)
         self.history_refresh_btn.setCursor(Qt.PointingHandCursor)
@@ -1468,7 +1469,7 @@ class MainWindow(QMainWindow):
         history_btn_layout.addStretch()
 
         record_count_label = QLabel("")
-        record_count_label.setFont(QFont("Microsoft YaHei", 10))
+        record_count_label.setFont(QFont(UI_FONT, 11))
         record_count_label.setObjectName("countLabel")
         self.record_count_label = record_count_label
         history_btn_layout.addWidget(record_count_label)
@@ -1485,12 +1486,12 @@ class MainWindow(QMainWindow):
         splitter.setObjectName("historySplitter")
 
         list_group = QGroupBox("历史记录")
-        list_group.setFont(QFont("Microsoft YaHei", 11, QFont.Medium))
+        list_group.setFont(QFont(UI_FONT, 12, QFont.Medium))
         list_group.setObjectName("historyGroup")
         list_layout = QVBoxLayout(list_group)
         list_layout.setContentsMargins(16, 24, 16, 16)
         self.history_list = QListWidget()
-        self.history_list.setFont(QFont("Microsoft YaHei", 10))
+        self.history_list.setFont(QFont(UI_FONT, 11))
         self.history_list.setObjectName("historyList")
         self.history_list.setMinimumHeight(180)
         self.history_list.setMaximumHeight(280)
@@ -1500,7 +1501,7 @@ class MainWindow(QMainWindow):
         splitter.addWidget(list_group)
 
         plot_group = QGroupBox("情绪趋势图")
-        plot_group.setFont(QFont("Microsoft YaHei", 11, QFont.Medium))
+        plot_group.setFont(QFont(UI_FONT, 12, QFont.Medium))
         plot_group.setObjectName("plotGroup")
         plot_layout = QVBoxLayout(plot_group)
         plot_layout.setContentsMargins(16, 24, 16, 12)
@@ -1514,7 +1515,7 @@ class MainWindow(QMainWindow):
                 "绘图库未安装\n\n趋势图功能暂不可用"
             )
             plot_placeholder.setAlignment(Qt.AlignCenter)
-            plot_placeholder.setFont(QFont("Microsoft YaHei", 11))
+            plot_placeholder.setFont(QFont(UI_FONT, 12))
             plot_placeholder.setStyleSheet("color: #86868B; padding: 40px;")
             plot_layout.addWidget(plot_placeholder)
 
@@ -1565,7 +1566,7 @@ class MainWindow(QMainWindow):
         btn_layout.setContentsMargins(0, 8, 0, 4)
 
         data_btn = QPushButton("数据管理")
-        data_btn.setFont(QFont("Microsoft YaHei", 10))
+        data_btn.setFont(QFont(UI_FONT, 11))
         data_btn.setMinimumHeight(32)
         data_btn.setMinimumWidth(110)
         data_btn.setObjectName("ghostBtn")
@@ -1582,7 +1583,7 @@ class MainWindow(QMainWindow):
             f"{current_model}  ·  Apache-2.0  ·  仅供个人参考"
         )
         self.credit_label.setAlignment(Qt.AlignCenter)
-        self.credit_label.setFont(QFont("Microsoft YaHei", 9))
+        self.credit_label.setFont(QFont(UI_FONT, 11))
         self.credit_label.setObjectName("creditLabel")
         self.credit_label.setWordWrap(True)
         bottom_container.addWidget(self.credit_label)
@@ -1604,7 +1605,7 @@ class MainWindow(QMainWindow):
 
         #headerTitle {
             color: #1D1D1F;
-            font-family: "Microsoft YaHei", "SimHei";
+            font-family: "Microsoft YaHei UI", "Microsoft YaHei", "SimHei";
         }
 
         /* 状态 pill — 通过 background-color 编码状态 */
@@ -1627,9 +1628,9 @@ class MainWindow(QMainWindow):
         QMenuBar {
             background-color: #FFFFFF;
             border-bottom: 1px solid #D2D2D7;
-            font-family: "Microsoft YaHei", "SimHei";
-            font-size: 11px;
-            padding: 2px;
+            font-family: "Microsoft YaHei UI", "Microsoft YaHei", "SimHei";
+            font-size: 12px;
+            padding: 4px;
         }
 
         QMenuBar::item {
@@ -1646,8 +1647,8 @@ class MainWindow(QMainWindow):
         QMenu {
             background-color: #FFFFFF;
             border: 1px solid #D2D2D7;
-            font-family: "Microsoft YaHei", "SimHei";
-            font-size: 11px;
+            font-family: "Microsoft YaHei UI", "Microsoft YaHei", "SimHei";
+            font-size: 12px;
             padding: 6px;
         }
 
@@ -1670,8 +1671,8 @@ class MainWindow(QMainWindow):
             background-color: transparent;
             padding: 12px 28px;
             margin: 0 2px;
-            font-size: 13px;
-            font-family: "Microsoft YaHei", "SimHei";
+            font-size: 15px;
+            font-family: "Microsoft YaHei UI", "Microsoft YaHei", "SimHei";
             color: #86868B;
             border: none;
         }
@@ -1691,7 +1692,7 @@ class MainWindow(QMainWindow):
             margin-top: 16px;
             padding-top: 18px;
             background-color: #FFFFFF;
-            font-family: "Microsoft YaHei", "SimHei";
+            font-family: "Microsoft YaHei UI", "Microsoft YaHei", "SimHei";
         }
 
         QGroupBox::title {
@@ -1709,9 +1710,9 @@ class MainWindow(QMainWindow):
             border: none;
             border-radius: 8px;
             padding: 18px;
-            font-family: "Microsoft YaHei", "SimHei";
+            font-family: "Microsoft YaHei UI", "Microsoft YaHei", "SimHei";
             font-weight: 500;
-            font-size: 15px;
+            font-size: 16px;
         }
 
         #recordBtn:enabled:hover {
@@ -1764,7 +1765,7 @@ class MainWindow(QMainWindow):
 
         #cardTitle {
             color: #1D1D1F;
-            font-family: "Microsoft YaHei", "SimHei";
+            font-family: "Microsoft YaHei UI", "Microsoft YaHei", "SimHei";
         }
 
         #cardValue {
@@ -1792,8 +1793,8 @@ class MainWindow(QMainWindow):
             background-color: #EBEBEF;
             text-align: center;
             color: #86868B;
-            font-size: 10pt;
-            font-family: "Microsoft YaHei", "SimHei";
+            font-size: 11pt;
+            font-family: "Microsoft YaHei UI", "Microsoft YaHei", "SimHei";
         }
 
         QProgressBar::chunk {
@@ -1817,7 +1818,7 @@ class MainWindow(QMainWindow):
             border-radius: 6px;
             background-color: #FFFFFF;
             padding: 4px;
-            font-family: "Microsoft YaHei", "SimHei";
+            font-family: "Microsoft YaHei UI", "Microsoft YaHei", "SimHei";
             outline: none;
         }
 
@@ -1909,7 +1910,7 @@ class MainWindow(QMainWindow):
         QPushButton {
             outline: none;
             border-radius: 6px;
-            font-family: "Microsoft YaHei", "SimHei";
+            font-family: "Microsoft YaHei UI", "Microsoft YaHei", "SimHei";
         }
 
         QPushButton:disabled {
@@ -1928,7 +1929,7 @@ class MainWindow(QMainWindow):
         }
 
         QLabel {
-            font-family: "Microsoft YaHei", "SimHei";
+            font-family: "Microsoft YaHei UI", "Microsoft YaHei", "SimHei";
         }
 
         QRadioButton {
@@ -2916,7 +2917,7 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    app.setFont(QFont("Microsoft YaHei", 10))
+    app.setFont(QFont(UI_FONT, 11))
     app.setStyle("Fusion")
     window = MainWindow()
     window.showMaximized()

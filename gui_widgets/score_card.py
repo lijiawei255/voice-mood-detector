@@ -21,6 +21,8 @@ from PyQt5.QtWidgets import QFrame, QVBoxLayout, QLabel, QSizePolicy
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
+from .fonts import UI_FONT, MONO_FONT
+
 
 class ScoreCard(QFrame):
     """
@@ -39,28 +41,28 @@ class ScoreCard(QFrame):
         self._compact = compact
 
         if compact:
-            self.setMinimumHeight(90)
-            self.setMaximumHeight(120)
+            self.setMinimumHeight(104)
+            self.setMaximumHeight(140)
             self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            title_font = QFont("Microsoft YaHei", 10, QFont.Medium)
-            value_font = QFont("Consolas", 26, QFont.Bold)
-            sub_font = QFont("Microsoft YaHei", 9)
+            title_font = QFont(UI_FONT, 11, QFont.Medium)
+            value_font = QFont(MONO_FONT, 30, QFont.Bold)
+            sub_font = QFont(UI_FONT, 10)
             margins = (16, 14, 16, 12)
             spacing = 6
-            title_h = 18
-            value_h = 34
-            sub_h = 16
+            title_h = 22
+            value_h = 40
+            sub_h = 18
         else:
-            self.setMinimumHeight(180)
+            self.setMinimumHeight(200)
             self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-            title_font = QFont("Microsoft YaHei", 11, QFont.Medium)
-            value_font = QFont("Consolas", 38, QFont.Bold)
-            sub_font = QFont("Microsoft YaHei", 11)
+            title_font = QFont(UI_FONT, 12, QFont.Medium)
+            value_font = QFont(MONO_FONT, 42, QFont.Bold)
+            sub_font = QFont(UI_FONT, 12)
             margins = (24, 24, 24, 24)
             spacing = 10
-            title_h = 25
-            value_h = 60
-            sub_h = 25
+            title_h = 26
+            value_h = 66
+            sub_h = 26
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(*margins)

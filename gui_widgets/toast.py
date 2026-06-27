@@ -18,6 +18,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QPainter, QBrush, QPainterPath, QColor
 
+from .fonts import UI_FONT
+
 
 # 极简主义色板
 _TEXT_PRIMARY = "#1D1D1F"
@@ -40,7 +42,7 @@ class ToastNotification(QFrame):
         super().__init__(parent)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.SubWindow)
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setFixedWidth(380)
+        self.setFixedWidth(420)
         self._opacity = 1.0
         self._level = level
 
@@ -75,15 +77,15 @@ class ToastNotification(QFrame):
         text_layout.setSpacing(2)
 
         title_label = QLabel(title_text)
-        title_label.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
+        title_label.setFont(QFont(UI_FONT, 12, QFont.Bold))
         title_label.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
         text_layout.addWidget(title_label)
 
         msg_label = QLabel(message)
-        msg_label.setFont(QFont("Microsoft YaHei", 9))
+        msg_label.setFont(QFont(UI_FONT, 10))
         msg_label.setWordWrap(True)
         msg_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
-        msg_label.setMaximumWidth(300)
+        msg_label.setMaximumWidth(330)
         text_layout.addWidget(msg_label)
 
         content_layout.addLayout(text_layout, 1)

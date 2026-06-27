@@ -15,6 +15,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
+from .fonts import UI_FONT, MONO_FONT
+
 
 # 极简主义色板常量
 _TEXT_PRIMARY = "#1D1D1F"
@@ -28,7 +30,7 @@ class StatsPanel(QGroupBox):
 
     def __init__(self, parent=None):
         super().__init__("统计分析", parent)
-        self.setFont(QFont("Microsoft YaHei", 11, QFont.Medium))
+        self.setFont(QFont(UI_FONT, 12, QFont.Medium))
         self.setObjectName("statsGroup")
         self.setStyleSheet(f"""
             QGroupBox#statsGroup {{
@@ -53,7 +55,7 @@ class StatsPanel(QGroupBox):
 
         self.content = QTextEdit()
         self.content.setReadOnly(True)
-        self.content.setFont(QFont("Consolas", 10))
+        self.content.setFont(QFont(MONO_FONT, 11))
         self.content.setMinimumHeight(200)
         self.content.setStyleSheet(f"""
             QTextEdit {{
