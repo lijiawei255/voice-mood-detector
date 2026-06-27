@@ -37,9 +37,12 @@ The UI follows **Soviet Constructivist** design principles: thick charcoal-black
 | 🧹 One-click Cleanup | One-click cleanup of temp files, cache, logs, etc. |
 | 📐 VAD Dimension Assessment | Valence, Arousal, Dominance & Negative Load estimation |
 | 🔊 Audio Quality Analysis | Real-time recording quality feedback (volume, clipping, noise, speech ratio) |
-| 📡 Acoustic Feature Extraction | Clinical-grade features: F0, jitter, shimmer, HNR, MFCC (P1) |
-| 🔬 Research Mode | Dual-model cross-validation, multi-sample evaluation, ICC reliability (P1) |
-| 📤 Research Data Export | CSV (SPSS/Excel compatible) & JSON full research dataset export (P1) |
+| 📡 Acoustic Feature Extraction | Clinical-grade features: F0, jitter, shimmer, HNR, MFCC |
+| 🧠 Psychological Indicators | Stress, anxiety, depression tendency, activation, speech-stability estimates (non-clinical) |
+| 🎚️ Personal Baseline | Collect 3-10 calm samples to build a baseline and show relative deviation |
+| 🔬 Research Mode | Ambient noise check, unified prompt, quality gate, 3-sample recording, optional dual-model validation |
+| 📤 Research Data Export | CSV (SPSS/Excel compatible) & JSON full research dataset export |
+| 📊 History Statistics | Descriptive statistics and trend analysis for stability and VAD dimensions |
 | 🎚️ Stability Factor Breakdown | Negative weight, entropy, extremity sub-scores output |
 | 🔍 Raw Output Preservation | Complete model labels/scores saved for research reproducibility |
 
@@ -143,8 +146,15 @@ When multiple compound emotions are simultaneously qualified, the system selects
 │                                              │                   │
 │                                              ▼                   │
 │                                   ┌──────────────────┐          │
-│                                   │ emotion2vec+ Infer│          │
-│                                   │ (CPU/GPU, FunASR) │          │
+│                                   │ Audio Quality    │          │
+│                                   │ (volume/noise/  │          │
+│                                   │  clipping)       │          │
+│                                   └────────┬─────────┘          │
+│                                            │                     │
+│                                            ▼                     │
+│                                   ┌──────────────────┐          │
+│                                   │ emotion2vec+     │          │
+│                                   │ (CPU, FunASR)    │          │
 │                                   └────────┬─────────┘          │
 │                                            │                     │
 │                                            ▼                     │
@@ -153,14 +163,21 @@ When multiple compound emotions are simultaneously qualified, the system selects
 │                                │ Probability Dist.  │            │
 │                                └─────────┬─────────┘            │
 │                                          │                       │
-│                ┌─────────────────────────┼──────────────────┐   │
-│                ▼                         ▼                   ▼   │
-│  ┌──────────────────┐  ┌────────────────────┐  ┌────────────┐  │
-│  │ 3-Factor Stability│  │ Compound Emotion   │  │ Mixed Emo  │  │
-│  │ Score Calculation │  │ Pattern Matching   │  │ Detection  │  │
-│  └────────┬─────────┘  └─────────┬──────────┘  └──────┬─────┘  │
-│           └───────────────────────┼──────────────────────┘      │
-│                                   ▼                              │
+│       ┌──────────────────────────────────┼───────────────────┐  │
+│       ▼                                  ▼                   ▼  │
+│  ┌──────────────┐  ┌─────────────────────┐  ┌──────────────┐  │
+│  │ 3-Factor     │  │ Compound Emotion    │  │ VAD Dimension│  │
+│  │ Stability    │  │ Pattern Matching    │  │ Estimation   │  │
+│  └──────┬───────┘  └──────────┬──────────┘  └──────┬───────┘  │
+│         │                     │                    │           │
+│         └─────────────────────┼────────────────────┘           │
+│                               ▼                                  │
+│              ┌───────────────────────────────┐                  │
+│              │ Acoustic Features +           │                  │
+│              │ Psychological Indicators      │                  │
+│              │ Reliability + Baseline Offset │                  │
+│              └───────────────┬───────────────┘                  │
+│                              ▼                                   │
 │                        ┌────────────────────┐                   │
 │                        │ Combined Result +  │                   │
 │                        │ Layered Suggestions│                   │
@@ -169,7 +186,12 @@ When multiple compound emotions are simultaneously qualified, the system selects
 │                       ┌──────────────────┐                      │
 │                       │ GUI Display +    │                      │
 │                       │ History Storage  │                      │
-│                       └──────────────────┘                      │
+│                       └──────────────────┐                      │
+│                                            │                      │
+│                                            ▼                      │
+│                               ┌────────────────────┐             │
+│                               │ History/Export     │             │
+│                               └────────────────────┘             │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -243,6 +265,19 @@ python main.py
 4. Click the red **"⏹️ Click to Stop Recording"** button
 5. Wait a few seconds to see the analysis results
 
+### Research Mode
+
+1. Select **"Research Mode"** in the recording control area
+2. Click **"Start Research Assessment"**
+3. The system performs a ~3-second ambient noise check
+4. Record 3 samples following the unified prompt (10-30 seconds each)
+5. Each sample passes an audio quality gate; re-record if it fails
+6. After 3 samples, the system outputs:
+   - Detailed emotion analysis for each sample
+   - Session-level dominant emotion and mean stability
+   - Multi-sample consistency / overall reliability
+   - Optional Large↔Base dual-model scale-sensitivity validation
+
 ### Results Explanation
 
 - **Emotional Stability**: 0-10 points, higher score indicates greater emotional fluctuation
@@ -256,6 +291,12 @@ python main.py
 - **Main Emotion**: Angry, Disgusted, Fearful, Happy, Calm, Sad, Surprised, Other
 - **Mixed Emotions**: Other emotions detected simultaneously (probability > 8%)
 - **Compound Emotions**: Higher-order emotional states composed of basic emotions
+- **VAD Dimensions**: Valence, Arousal, Dominance, and Negative Load
+- **Stability Factors**: Negative weight, emotion dispersion (entropy), and extremity sub-scores
+- **Acoustic Features**: F0, jitter, shimmer, HNR, speech rate, silence ratio, etc.
+- **Psychological Indicators**: Stress, anxiety, depression tendency, activation, speech stability (non-clinical)
+- **Reliability**: High/Medium/Low rating combining audio quality, confidence, and consistency
+- **Baseline Deviation**: z-score deviation relative to an established personal baseline
 - **Suggestions**: Layered suggestions based on emotional state (immediate + long-term)
 
 ### Model Switching
@@ -264,6 +305,13 @@ The system supports three model sizes:
 - **Seed (Smallest)**: ~200MB, for low-spec devices
 - **Base (Standard)**: ~500MB, speed-accuracy balance
 - **Large (Largest)**: ~1GB, highest accuracy (recommended)
+
+### Personal Baseline Calibration
+
+1. Click **"Collect Baseline Sample"** in the **"Personal Baseline"** panel on the right
+2. Record 5-10 seconds of calm, relaxed speech
+3. Repeat 3-10 times to establish a stable baseline
+4. After the baseline is established, subsequent detections show both absolute scores and relative baseline deviation
 
 ### History Records
 
@@ -315,11 +363,22 @@ Voice_Mood_Detect/
 ├── main.py                 # Entry point: env config + PyQt5 app launch
 ├── gui.py                  # GUI: main window, widgets, interaction logic
 ├── emotion_recognizer.py   # Emotion recognition core: model + inference + algorithms
+├── research_session.py     # Research-mode orchestration (noise check / multi-sample / dual-model)
 ├── recorder.py             # Audio recording: threaded recording + WAV save
 ├── history_manager.py      # History management: atomic write + data sanitization
+├── audio_features.py       # Acoustic feature extraction (F0 / jitter / shimmer / HNR / MFCC)
+├── audio_quality.py        # Audio quality analysis (volume / noise / clipping / speech ratio)
+├── baseline.py             # Personal baseline modeling and deviation assessment
+├── reliability.py          # Assessment reliability (ICC / multi-sample / model agreement)
+├── statistics.py           # History statistics analysis
+├── export_manager.py       # CSV / JSON research data export
+├── vad_dimensions.py       # VAD dimension estimation
 ├── app_paths.py            # Path management: portable mode + security checks
 ├── relaxation_tips.py      # Relaxation tips: layered suggestion library
+├── version.py              # Version and algorithm metadata
 ├── requirements.txt        # Python dependencies
+├── tests/                  # Test suite
+├── gui_widgets/            # Reusable GUI widget package
 ├── LICENSE                 # GPL v3 license
 ├── README.md               # Chinese documentation
 ├── README.en.md            # English documentation
@@ -351,9 +410,10 @@ portable_data/
 ├── models/            # AI model files (not deletable, ~1GB)
 │   └── models/iic/   # ModelScope model cache structure
 ├── logs/              # Runtime logs (clearable)
-├── temp/              # Temporary files (clearable)
+├── temp/              # Temporary files (clearable, incl. debug screenshots)
 ├── cache/             # Cache files (clearable)
 ├── history.json       # History records (JSON format)
+├── baseline.json      # Personal baseline samples and statistics
 └── model_config.json  # Model config (currently selected model)
 ```
 
@@ -416,6 +476,9 @@ pip install -r requirements.txt
 
 # Run the program
 python main.py
+
+# Run tests
+python -m pytest tests/ -v
 ```
 
 ### Code Standards

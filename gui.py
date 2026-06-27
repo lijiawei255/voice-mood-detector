@@ -37,7 +37,7 @@ from PyQt5.QtWidgets import (
     QTabWidget, QGroupBox, QPushButton, QLabel, QProgressBar, QTextEdit,
     QListWidget, QSplitter, QFrame, QSizePolicy, QMessageBox, QFileDialog,
     QMenuBar, QMenu, QAction, QGridLayout, QScrollArea, QDialog, QComboBox,
-    QRadioButton, QButtonGroup
+    QRadioButton, QButtonGroup, QInputDialog
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize, QObject, QUrl, QPropertyAnimation, QEasingCurve, QRect
 from PyQt5.QtGui import QFont, QPalette, QColor, QDesktopServices, QPainter, QBrush, QPen, QPainterPath
@@ -45,8 +45,13 @@ from PyQt5.QtGui import QFont, QPalette, QColor, QDesktopServices, QPainter, QBr
 from recorder import AudioRecorder
 from emotion_recognizer import EmotionRecognizer
 from history_manager import HistoryManager
+from baseline import PersonalBaseline
 from gui_widgets.result_cards import ResultCardWidget, DimensionBar
 from gui_widgets.research_panel import ResearchRadarChart, ExportToolbar
+from gui_widgets.assessment_cards import (
+    AcousticFeatureCard, PsychologicalIndicatorCard,
+    ReliabilityBadge, BaselineDeviationCard,
+)
 from gui_widgets.score_card import ScoreCard
 from gui_widgets.background import ConstructivistBackground
 from gui_widgets.chart import MplCanvas
@@ -54,6 +59,7 @@ from gui_widgets.threads import RecordingThread, AnalysisThread, ModelLoadThread
 from gui_widgets.toast import ToastNotification, ToastManager
 from gui_widgets.baseline_panel import BaselinePanel
 from gui_widgets.stats_panel import StatsPanel
+from research_session import ResearchSession
 from app_paths import (
     get_recordings_dir, get_log_file, get_temp_dir,
     get_cache_dir, get_user_data_dir, get_model_cache_dir,
@@ -852,6 +858,18 @@ class MainWindow(QMainWindow):
         self.temp_files = []
         self._closing = False
 
+        # P1/P2 新增：评估模式与基线管理
+        self.is_research_mode = False
+        self.research_session = None
+        self.baseline_manager = None
+        self.current_result = None
+        self._collecting_baseline = False
+
+        try:
+            self.baseline_manager = PersonalBaseline()
+        except Exception as e:
+            logger.warning(f"基线管理器初始化失败: {e}")
+
         self.log_signal.connect(self._append_log_safe)
         self.model_loaded_signal.connect(self._on_model_loaded_safe)
         self.model_progress_signal.connect(self._append_log_safe)
@@ -956,8 +974,8 @@ class MainWindow(QMainWindow):
     @exception_safe()
     def init_ui(self):
         self.setWindowTitle("语音情绪识别系统 v1.1 - 便携版")
-        self.setMinimumSize(1200, 800)
-        self.resize(1400, 900)
+        self.setMinimumSize(1200, 850)
+        self.resize(1500, 1000)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -1174,17 +1192,42 @@ class MainWindow(QMainWindow):
             }
         """)
         control_layout = QVBoxLayout(control_group)
-        control_layout.setSpacing(12)
-        control_layout.setContentsMargins(20, 25, 20, 20)
+        control_layout.setSpacing(10)
+        control_layout.setContentsMargins(18, 20, 18, 16)
 
         self.record_btn = QPushButton("■ 模型加载中...")
         self.record_btn.setFont(QFont("Microsoft YaHei", 22, QFont.Black))
-        self.record_btn.setMinimumHeight(110)
+        self.record_btn.setMinimumHeight(84)
         self.record_btn.setObjectName("recordBtn")
         self.record_btn.clicked.connect(self.toggle_recording)
         self.record_btn.setEnabled(False)
         self.record_btn.setCursor(Qt.PointingHandCursor)
         control_layout.addWidget(self.record_btn)
+
+        # P1 新增：快速检测 / 科研评估模式切换
+        mode_layout = QHBoxLayout()
+        mode_layout.setSpacing(8)
+        mode_label = QLabel("评估模式：")
+        mode_label.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
+        mode_layout.addWidget(mode_label)
+
+        self.mode_quick = QRadioButton("快速检测")
+        self.mode_quick.setFont(QFont("Microsoft YaHei", 10))
+        self.mode_quick.setChecked(True)
+        self.mode_research = QRadioButton("科研评估")
+        self.mode_research.setFont(QFont("Microsoft YaHei", 10))
+        self.mode_research.setToolTip(
+            "科研评估模式：3秒环境噪声检测 + 统一提示语 + 质量门控 + 3段采样 + 双模型验证"
+        )
+        self.mode_quick.toggled.connect(self._on_mode_changed)
+
+        mode_group = QButtonGroup(self)
+        mode_group.addButton(self.mode_quick)
+        mode_group.addButton(self.mode_research)
+        mode_layout.addWidget(self.mode_quick)
+        mode_layout.addWidget(self.mode_research)
+        mode_layout.addStretch()
+        control_layout.addLayout(mode_layout)
 
         info_grid = QGridLayout()
         info_grid.setSpacing(10)
@@ -1196,7 +1239,7 @@ class MainWindow(QMainWindow):
         info_grid.addWidget(duration_title, 0, 0)
 
         self.duration_display = QLabel("00:00")
-        self.duration_display.setFont(QFont("Consolas", 28, QFont.Black))
+        self.duration_display.setFont(QFont("Consolas", 24, QFont.Black))
         self.duration_display.setMinimumWidth(120)
         self.duration_display.setAlignment(Qt.AlignCenter)
         self.duration_display.setObjectName("durationLabel")
@@ -1261,23 +1304,29 @@ class MainWindow(QMainWindow):
         result_layout.setSpacing(18)
         result_layout.setContentsMargins(25, 25, 25, 25)
 
-        # 构成主义不对称卡片布局：左侧大卡片(2列宽) + 右侧3小卡片堆叠
-        cards_grid = QGridLayout()
-        cards_grid.setSpacing(12)
+        # 构成主义不对称卡片布局：左侧大卡片 + 右侧3小卡片垂直堆叠
+        cards_outer = QHBoxLayout()
+        cards_outer.setSpacing(12)
 
         self.score_card = ScoreCard("情绪稳定度 (0-10)", accent_color="#C44B4F")
+        self.score_card.setMinimumWidth(280)
         self.score_card.setMinimumHeight(220)
-        self.level_card = ScoreCard("情绪状态", accent_color="#C44B4F")
-        self.emotion_card = ScoreCard("主要情绪", accent_color="#C44B4F")
-        self.compound_card = ScoreCard("复合情绪", accent_color="#C44B4F")
+        cards_outer.addWidget(self.score_card, 3)
 
-        # 网格布局：左侧大卡片占2行2列，右侧3张小卡片各占1行1列
-        cards_grid.addWidget(self.score_card, 0, 0, 3, 2)    # 占3行2列
-        cards_grid.addWidget(self.level_card, 0, 2, 1, 1)    # 第1行第3列
-        cards_grid.addWidget(self.emotion_card, 1, 2, 1, 1)  # 第2行第3列
-        cards_grid.addWidget(self.compound_card, 2, 2, 1, 1) # 第3行第3列
+        right_cards = QVBoxLayout()
+        right_cards.setSpacing(10)
 
-        result_layout.addLayout(cards_grid)
+        self.level_card = ScoreCard("情绪状态", accent_color="#C44B4F", compact=True)
+        right_cards.addWidget(self.level_card, 1)
+
+        self.emotion_card = ScoreCard("主要情绪", accent_color="#C44B4F", compact=True)
+        right_cards.addWidget(self.emotion_card, 1)
+
+        self.compound_card = ScoreCard("复合情绪", accent_color="#C44B4F", compact=True)
+        right_cards.addWidget(self.compound_card, 1)
+
+        cards_outer.addLayout(right_cards, 2)
+        result_layout.addLayout(cards_outer)
 
         # P0 新增：集成化科研评估报告卡片（VAD维度 + 稳定度分项 + 音频质量）
         self.result_card_widget = ResultCardWidget()
@@ -1288,6 +1337,20 @@ class MainWindow(QMainWindow):
         self.radar_chart = ResearchRadarChart()
         self.radar_chart.hide()
         result_layout.addWidget(self.radar_chart)
+
+        # P1/P2 新增：扩展评估卡片
+        self.reliability_badge = ReliabilityBadge()
+        self.reliability_badge.hide()
+        result_layout.addWidget(self.reliability_badge)
+
+        self.acoustic_card = AcousticFeatureCard()
+        result_layout.addWidget(self.acoustic_card)
+
+        self.psychological_card = PsychologicalIndicatorCard()
+        result_layout.addWidget(self.psychological_card)
+
+        self.baseline_deviation_card = BaselineDeviationCard()
+        result_layout.addWidget(self.baseline_deviation_card)
 
         # 分数说明
         stability_hint = QLabel("■ 分数越低越稳定 · 0分最稳定 · 10分波动最大")
@@ -1349,11 +1412,12 @@ class MainWindow(QMainWindow):
             result_layout.addLayout(bar_row)
 
 
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QFrame.NoFrame)
-        scroll_area.setWidget(result_group)
-        left_layout.addWidget(scroll_area, 1)
+        self.result_scroll_area = QScrollArea()
+        self.result_scroll_area.setWidgetResizable(True)
+        self.result_scroll_area.setFrameShape(QFrame.NoFrame)
+        self.result_scroll_area.setMinimumHeight(360)
+        self.result_scroll_area.setWidget(result_group)
+        left_layout.addWidget(self.result_scroll_area, 1)
 
         content_splitter.addWidget(left_panel)
 
@@ -1461,13 +1525,19 @@ class MainWindow(QMainWindow):
         guide_layout.addWidget(tip_label)
 
         guide_scroll.setWidget(quick_guide)
-        right_layout.addWidget(guide_scroll)
+        right_layout.addWidget(guide_scroll, 1)
+
+        # P2 新增：个人基线面板
+        self.baseline_panel = BaselinePanel()
+        self.baseline_panel.baseline_collect_requested.connect(self._on_baseline_collect)
+        self.baseline_panel.baseline_reset_requested.connect(self._on_baseline_reset)
+        right_layout.addWidget(self.baseline_panel)
 
         content_splitter.addWidget(right_panel)
 
         content_splitter.setStretchFactor(0, 6)
         content_splitter.setStretchFactor(1, 4)
-        content_splitter.setSizes([780, 420])
+        content_splitter.setSizes([920, 520])
 
         layout.addWidget(content_splitter)
         self.tab_widget.addTab(realtime_widget, "▸ 实时检测")
@@ -1577,11 +1647,16 @@ class MainWindow(QMainWindow):
             plot_layout.addWidget(plot_placeholder)
 
         splitter.addWidget(plot_group)
-        splitter.setSizes([250, 550])
+        splitter.setSizes([250, 400])
         splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 2)
+        splitter.setStretchFactor(1, 1)
 
         layout.addWidget(splitter)
+
+        # P0 新增：历史统计面板
+        self.stats_panel = StatsPanel()
+        layout.addWidget(self.stats_panel)
+
         self.tab_widget.addTab(history_widget, "▸ 历史报告")
 
     @exception_safe()
@@ -1989,6 +2064,25 @@ class MainWindow(QMainWindow):
         """
         self.setStyleSheet(qss)
 
+    def _on_mode_changed(self):
+        """评估模式切换处理"""
+        self.is_research_mode = self.mode_research.isChecked()
+        if self.is_research_mode:
+            self.record_btn.setText("■ 开始科研评估")
+            self.status_label.setText("■ 科研模式")
+            self.status_label.setStyleSheet(
+                "color: #FFFFFF; background-color: #C44B4F; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;"
+            )
+            self.append_log("已切换到科研评估模式")
+        else:
+            ready = self.recognizer and self.recognizer.is_ready()
+            self.record_btn.setText("■ 点击开始录音" if ready else "■ 模型加载中...")
+            self.status_label.setText("■ 准备就绪" if ready else "■ 正在启动...")
+            self.status_label.setStyleSheet(
+                "color: #FFFFFF; background-color: #2B2B2B; padding: 8px 18px; border-radius: 0px; border: 2px solid #2B2B2B; font-weight: bold;"
+            )
+            self.append_log("已切换到快速检测模式")
+
     def toggle_recording(self, checked=False):
         try:
             self.append_log("检测到录音按钮点击")
@@ -2006,6 +2100,10 @@ class MainWindow(QMainWindow):
 
             if self.is_analyzing:
                 QMessageBox.information(self, "请稍候", "正在分析中，请等待当前分析完成")
+                return
+
+            if self.is_research_mode:
+                self._start_research_session()
                 return
 
             if not self.is_recording:
@@ -2033,6 +2131,68 @@ class MainWindow(QMainWindow):
         self.record_progress.setRange(0, 100)
         self.record_progress.setValue(0)
         self._set_buttons_enabled(True)
+
+    def _start_research_session(self):
+        """启动科研评估会话"""
+        if self.research_session and self.research_session._is_cancelled() is False:
+            QMessageBox.information(self, "请稍候", "科研评估正在进行中")
+            return
+
+        if not self.recognizer or not self.recognizer.is_ready():
+            QMessageBox.warning(self, "请稍候", "模型尚未加载完成")
+            return
+
+        prompt, ok = QInputDialog.getText(
+            self, "科研评估提示语",
+            "请输入统一提示语（例如：请用平稳的语气描述今天的感受）：",
+            text="请用平稳的语气描述今天的感受"
+        )
+        if not ok:
+            return
+
+        self.record_btn.setEnabled(False)
+        self.record_btn.setText("■ 科研评估进行中...")
+        self.record_progress.setRange(0, 100)
+        self.record_progress.setValue(5)
+        self.quality_feedback.setText("环境检测中...")
+        self._set_buttons_enabled(False)
+
+        self.research_session = ResearchSession(self.recorder, self.recognizer)
+
+        def on_progress(phase, message, progress):
+            self.status_label.setText(f"■ {phase}: {message[:20]}")
+            self.record_progress.setValue(progress)
+            self.quality_feedback.setText(message)
+            self.append_log(f"[科研模式] {phase}: {message}")
+
+        def on_finished(result):
+            self.record_progress.setValue(100)
+            self.record_btn.setEnabled(True)
+            self.record_btn.setText("■ 开始科研评估")
+            self._set_buttons_enabled(True)
+            if result.get("success"):
+                self.quality_feedback.setText("科研评估完成")
+                self.status_label.setText("■ 科研评估完成")
+                self._display_research_result(result)
+                # 保存到历史记录（以会话首段音频为代表）
+                sample_results = result.get("sample_results", [])
+                if sample_results:
+                    sample_results[0]["is_research_mode"] = True
+                    self.history_manager.add_record(sample_results[0])
+                    self.refresh_history_list()
+            else:
+                self.quality_feedback.setText(f"评估失败: {result.get('error', '')}")
+                self.status_label.setText("■ 科研评估失败")
+                self.append_log(f"科研评估失败: {result.get('error')}")
+                QMessageBox.warning(self, "科研评估失败", result.get("error", "未知错误"))
+
+        self.research_session.run_async(
+            prompt_text=prompt,
+            n_samples=3,
+            use_dual_model=True,
+            progress_callback=on_progress,
+            finished_callback=on_finished,
+        )
 
     def start_recording_action(self):
         try:
@@ -2301,6 +2461,142 @@ class MainWindow(QMainWindow):
         self.record_btn.setEnabled(enabled and self.recognizer and self.recognizer.is_ready())
 
     @exception_safe()
+    def _on_baseline_collect(self):
+        """请求采集一条平静状态基线样本"""
+        if not self.baseline_manager:
+            QMessageBox.warning(self, "提示", "基线管理器未初始化")
+            return
+        if self.baseline_manager.is_established():
+            reply = QMessageBox.question(
+                self, "基线已建立",
+                "个人基线已建立，是否继续添加样本？",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+        self._collecting_baseline = True
+        self.mode_quick.setChecked(True)
+        QMessageBox.information(
+            self, "采集基线样本",
+            "请用平静、放松的状态录制一段 5-10 秒的语音，系统将把它作为个人基线参考。"
+        )
+        self.toggle_recording()
+
+    @exception_safe()
+    def _on_baseline_reset(self):
+        """重置个人基线"""
+        if not self.baseline_manager:
+            return
+        reply = QMessageBox.question(
+            self, "确认重置",
+            "确定要清空所有基线样本吗？此操作不可恢复。",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            self.baseline_manager.reset()
+            self.baseline_panel.update_status(self.baseline_manager)
+            self.baseline_deviation_card.update_deviation({"available": False})
+            self.append_log("个人基线已重置")
+
+    @exception_safe()
+    def _update_baseline_panel(self):
+        """刷新基线面板状态"""
+        if self.baseline_manager and self.baseline_panel:
+            self.baseline_panel.update_status(self.baseline_manager)
+
+    def _update_assessment_cards(self, result):
+        """统一更新所有评估卡片（快速模式与科研模式共用）"""
+        if not isinstance(result, dict) or not result.get('success'):
+            return
+
+        self.current_result = result
+
+        score = result.get('情绪稳定度分数', 0.0)
+        level = result.get('情绪状态等级', '未知')
+        color = result.get('等级颜色', '#8A8580')
+        main_emotion = result.get('主要情绪', '未知')
+        confidence = result.get('置信度', 0.0)
+
+        self.score_card.set_value(f"{score:.1f}", color, "分")
+        self.level_card.set_value(level, color)
+        self.emotion_card.set_value(main_emotion, "#C44B4F", f"置信度 {confidence:.1%}")
+
+        self.result_card_widget.update_result(result)
+        self.result_card_widget.show()
+
+        self.radar_chart.update_values(
+            valence=result.get('valence_score', 0.0),
+            arousal=result.get('arousal_score', 0.0),
+            dominance=result.get('dominance_score', 0.0),
+            negative_load=result.get('negative_load', 0.0),
+            uncertainty=result.get('emotional_uncertainty', 0.0)
+        )
+        self.radar_chart.show()
+
+        compound_emotion = result.get('复合情绪', '')
+        compound_detail = result.get('复合情绪详情', None)
+        if compound_emotion:
+            self.compound_card.set_value(compound_emotion, "#C44B4F", compound_detail.get('desc', '')[:20] if compound_detail else "")
+        else:
+            self.compound_card.set_value("未检测到", "#8A8580", "情绪状态较单一")
+
+        self.reliability_badge.update_reliability(result)
+        self.acoustic_card.update_features(result.get('acoustic_features', {}))
+        self.psychological_card.update_indicators(result.get('psychological_indicators', {}))
+
+        baseline_deviation = result.get('baseline_deviation', {})
+        self.baseline_deviation_card.update_deviation(baseline_deviation)
+
+        # 概率条
+        probs = result.get('所有情绪概率', {})
+        for emotion, bar in self.prob_bars.items():
+            try:
+                prob = float(probs.get(emotion, 0.0))
+                pct = int(prob * 100)
+                bar.setValue(pct)
+                if emotion in self.prob_labels:
+                    self.prob_labels[emotion].setText(f"{pct}%")
+            except (TypeError, ValueError):
+                bar.setValue(0)
+                if emotion in self.prob_labels:
+                    self.prob_labels[emotion].setText("0%")
+
+    def _display_research_result(self, result):
+        """展示科研模式会话结果"""
+        if not result.get('success'):
+            return
+        sample_results = result.get('sample_results', [])
+        if not sample_results:
+            return
+
+        # 以第一段样本为代表展示详细卡片
+        first = sample_results[0]
+        first['is_research_mode'] = True
+        first['result_reliability'] = result.get('result_reliability', '')
+        first['model_agreement'] = result.get('model_agreement')
+        first['consistency'] = result.get('consistency')
+        first['is_research_session'] = True
+        self._update_assessment_cards(first)
+
+        # 显示会话级汇总
+        summary = (
+            f"科研评估完成：{result.get('n_samples', 0)} 段采样 | "
+            f"会话主要情绪: {result.get('session_emotion', '--')} | "
+            f"稳定度均值: {result.get('session_stability_mean', 0):.1f} ± {result.get('session_stability_std', 0):.1f} | "
+            f"综合可靠性: {result.get('overall_reliability', '--')}"
+        )
+        self.warning_label.setText(summary)
+        self.warning_label.setStyleSheet("""
+            background-color: #F2EDE4;
+            color: #2B2B2B;
+            border: 3px solid #2B2B2B;
+            border-radius: 0px;
+            padding: 12px 20px;
+            font-weight: bold;
+        """)
+        self.warning_label.show()
+
+    @exception_safe()
     def on_analysis_finished(self, result):
         self.record_progress.setRange(0, 100)
         self.record_progress.setValue(100)
@@ -2370,6 +2666,12 @@ class MainWindow(QMainWindow):
                 else:
                     self.compound_card.set_value("未检测到", "#8A8580", "情绪状态较单一")
 
+                # P1/P2 新增：扩展评估卡片
+                self.reliability_badge.update_reliability(result)
+                self.acoustic_card.update_features(result.get('acoustic_features', {}))
+                self.psychological_card.update_indicators(result.get('psychological_indicators', {}))
+                self.baseline_deviation_card.update_deviation(result.get('baseline_deviation', {}))
+
                 from emotion_recognizer import STABILITY_LEVELS
                 border_color = color
                 bg_color = border_color + "15"
@@ -2407,6 +2709,22 @@ class MainWindow(QMainWindow):
 
                 result_copy = dict(result)
                 result_copy['anxiety_score'] = score
+
+                # P2 新增：基线样本采集
+                if self._collecting_baseline and self.baseline_manager:
+                    self.baseline_manager.add_sample(result_copy)
+                    self._collecting_baseline = False
+                    self._update_baseline_panel()
+                    self.baseline_deviation_card.update_deviation(
+                        self.baseline_manager.compute_deviation(result_copy)
+                    )
+                    self.append_log("基线样本已采集")
+                    QMessageBox.information(
+                        self, "基线样本",
+                        f"已采集 {self.baseline_manager.get_sample_count()} 条基线样本。"
+                        f"达到 3 条后将自动建立个人基线。"
+                    )
+
                 self.history_manager.add_record(result_copy)
 
                 if score >= 6.5:
@@ -2544,6 +2862,10 @@ class MainWindow(QMainWindow):
 
             if MATPLOTLIB_AVAILABLE and hasattr(self, 'canvas'):
                 self.canvas.plot_data(records)
+
+            # P0 新增：刷新统计面板
+            if hasattr(self, 'stats_panel') and self.stats_panel:
+                self.stats_panel.update_stats(self.history_manager)
         except Exception as e:
             logger.error(f"刷新历史记录异常: {str(e)}", exc_info=True)
             self.append_log(f"刷新历史记录失败: {str(e)}")

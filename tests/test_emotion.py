@@ -1,92 +1,95 @@
+# -*- coding: utf-8 -*-
+"""
+情绪识别端到端测试（pytest 版本）
+
+使用 portable_data/recordings/ 目录下的 WAV 文件进行实际推理，
+验证 predict() 返回字段完整且数值范围正确。
+若模型未下载或无音频文件，则自动跳过。
+"""
+
 import os
 import sys
+import unittest
 
-def test_emotion_recognition():
-    print("=" * 70)
-    print("语音情绪识别系统 - 自动化测试")
-    print("=" * 70)
-    
-    recordings_dir = r"c:\Work\Voice_Mood_Detect\recordings"
-    if not os.path.exists(recordings_dir):
-        print(f"✗ 录音目录不存在: {recordings_dir}")
-        return False
-    
-    test_files = [f for f in os.listdir(recordings_dir) if f.endswith('.wav')]
-    if not test_files:
-        print("✗ 未找到测试音频文件")
-        return False
-    
-    print(f"\n找到 {len(test_files)} 个测试音频文件:")
-    for f in test_files:
-        print(f"  - {f}")
-    
-    print("\n" + "-" * 70)
-    print("正在加载情绪识别模型...")
-    print("-" * 70)
-    
-    from emotion_recognizer import EmotionRecognizer
-    recognizer = EmotionRecognizer()
-    
-    if not recognizer.loaded:
-        print(f"✗ 模型加载失败: {recognizer.error}")
-        return False
-    
-    print("✓ 模型加载成功")
-    
-    all_passed = True
-    results = []
-    
-    for filename in test_files:
-        audio_path = os.path.join(recordings_dir, filename)
-        print(f"\n{'='*70}")
-        print(f"测试音频: {filename}")
-        print(f"文件路径: {audio_path}")
-        print("-" * 70)
-        
-        result = recognizer.predict(audio_path)
-        
-        if result.get("success", False):
-            print("✓ 推理成功！")
-            print(f"  主要情绪: {result['主要情绪']}")
-            print(f"  置信度: {result['置信度']:.2%}")
-            print(f"  焦虑分数: {result['焦虑分数']:.1f}/10")
-            print(f"  情绪等级: {result['情绪等级']}")
-            print(f"\n  情绪概率分布:")
-            for emotion, prob in sorted(result['所有情绪概率'].items(), key=lambda x: -x[1]):
-                bar = "█" * int(prob * 30)
-                print(f"    {emotion:4s}: {prob:6.2%} {bar}")
-            results.append((filename, True, result))
-        else:
-            print(f"✗ 推理失败: {result.get('error', '未知错误')}")
-            all_passed = False
-            results.append((filename, False, result))
-    
-    print("\n" + "=" * 70)
-    print("测试结果汇总")
-    print("=" * 70)
-    passed = sum(1 for _, ok, _ in results if ok)
-    total = len(results)
-    print(f"\n总测试数: {total}")
-    print(f"通过: {passed}")
-    print(f"失败: {total - passed}")
-    
-    for filename, ok, result in results:
-        status = "✓ 通过" if ok else "✗ 失败"
-        if ok:
-            print(f"  {status} - {filename} -> {result['情绪等级']} (分数: {result['焦虑分数']:.1f})")
-        else:
-            print(f"  {status} - {filename} -> 错误: {result.get('error', '未知')}")
-    
-    print("\n" + "=" * 70)
-    if all_passed:
-        print("✓ 所有测试通过！情绪识别功能正常。")
-    else:
-        print("✗ 部分测试失败，请检查问题。")
-    print("=" * 70)
-    
-    return all_passed
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from app_paths import setup_modelscope_cache, is_model_downloaded, get_recordings_dir, load_model_config
+
+setup_modelscope_cache()
+
+_MODEL_NAME = load_model_config()
+_MODEL_DOWNLOADED = is_model_downloaded(_MODEL_NAME)
+
+
+def _get_test_wav_files():
+    """获取录音目录中的 WAV 文件"""
+    recordings_dir = get_recordings_dir()
+    if not os.path.isdir(recordings_dir):
+        return []
+    return [os.path.join(recordings_dir, f) for f in os.listdir(recordings_dir)
+            if f.lower().endswith('.wav')]
+
+
+_WAV_FILES = _get_test_wav_files()
+
+
+@unittest.skipUnless(_MODEL_DOWNLOADED, "未检测到已下载模型，跳过情绪识别测试")
+@unittest.skipUnless(len(_WAV_FILES) > 0, "未找到 WAV 测试文件")
+class TestEmotionRecognition(unittest.TestCase):
+    """情绪识别端到端测试"""
+
+    @classmethod
+    def setUpClass(cls):
+        from emotion_recognizer import EmotionRecognizer
+        cls.recognizer = EmotionRecognizer(model_name=_MODEL_NAME)
+        import threading
+        loaded_event = threading.Event()
+        cls._load_error = None
+
+        def on_loaded(success, error):
+            if not success:
+                cls._load_error = error
+            loaded_event.set()
+
+        cls.recognizer.load_model(callback=on_loaded)
+        loaded_event.wait(timeout=120)
+        if not cls.recognizer.is_ready():
+            raise unittest.SkipTest(f"模型加载失败或超时: {cls._load_error or '未知错误'}")
+
+    def test_predict_returns_required_fields(self):
+        """predict() 返回所有必需字段"""
+        required_fields = [
+            "主要情绪", "置信度", "所有情绪概率", "完整概率_8类",
+            "情绪稳定度分数", "情绪状态等级", "等级颜色",
+            "调节建议", "混合情绪", "复合情绪", "复合情绪详情",
+            "valence_score", "arousal_score", "dominance_score",
+            "negative_load", "emotional_uncertainty",
+            "稳定度分项", "原始模型输出", "情绪分析摘要",
+        ]
+        for audio_path in _WAV_FILES[:3]:
+            with self.subTest(file=os.path.basename(audio_path)):
+                result = self.recognizer.predict(audio_path)
+                self.assertTrue(result.get("success"),
+                                f"推理失败: {result.get('error')}")
+                for field in required_fields:
+                    self.assertIn(field, result, f"缺少字段: {field}")
+
+    def test_predict_value_ranges(self):
+        """数值范围约束验证"""
+        for audio_path in _WAV_FILES[:3]:
+            with self.subTest(file=os.path.basename(audio_path)):
+                result = self.recognizer.predict(audio_path)
+                if not result.get("success"):
+                    self.skipTest(f"推理失败: {result.get('error')}")
+                self.assertGreaterEqual(result["置信度"], 0.0)
+                self.assertLessEqual(result["置信度"], 1.0)
+                self.assertGreaterEqual(result["情绪稳定度分数"], 0.0)
+                self.assertLessEqual(result["情绪稳定度分数"], 10.0)
+                self.assertGreaterEqual(result["valence_score"], -1.0)
+                self.assertLessEqual(result["valence_score"], 1.0)
+                self.assertGreaterEqual(result["arousal_score"], 0.0)
+                self.assertLessEqual(result["arousal_score"], 1.0)
 
 
 if __name__ == "__main__":
-    success = test_emotion_recognition()
-    sys.exit(0 if success else 1)
+    unittest.main()

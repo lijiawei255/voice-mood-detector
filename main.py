@@ -23,12 +23,6 @@
 许可证：GPL v3
 """
 
-# ---------------------------------------------------------------------------
-# 版本常量（用于实验元数据记录，确保科研可复现性）
-# ---------------------------------------------------------------------------
-APP_VERSION = "2.0.0"
-ALGORITHM_VERSION = "2.0.0-p0"
-
 import sys
 import os
 
@@ -50,6 +44,7 @@ os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 # setup_modelscope_cache() 将 ModelScope/HuggingFace/PyTorch 缓存重定向到 portable_data/models/
 # 必须在导入 modelscope/funasr 之前完成，否则环境变量不会生效
 from app_paths import setup_modelscope_cache, get_log_file
+from version import APP_VERSION, ALGORITHM_VERSION
 setup_modelscope_cache()
 
 from PyQt5.QtWidgets import QApplication

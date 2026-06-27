@@ -29,38 +29,62 @@ class ScoreCard(QFrame):
         title (str): 卡片标题
         parent: 父窗口部件
         accent_color (str): 装饰色（砖红）
+        compact (bool): 是否为紧凑模式（用于右侧小卡片）
     """
-    def __init__(self, title, parent=None, accent_color="#C44B4F"):
+    def __init__(self, title, parent=None, accent_color="#C44B4F", compact=False):
         super().__init__(parent)
         self.setObjectName("scoreCard")
-        self.setMinimumHeight(180)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self._accent_color = accent_color
+        self._compact = compact
+
+        if compact:
+            self.setMinimumHeight(90)
+            self.setMaximumHeight(120)
+            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            title_font = QFont("Microsoft YaHei", 10, QFont.Bold)
+            value_font = QFont("Consolas", 26, QFont.Bold)
+            sub_font = QFont("Microsoft YaHei", 9)
+            margins = (12, 10, 12, 8)
+            spacing = 4
+            title_h = 18
+            value_h = 34
+            sub_h = 16
+        else:
+            self.setMinimumHeight(180)
+            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+            title_font = QFont("Microsoft YaHei", 11, QFont.Bold)
+            value_font = QFont("Consolas", 38, QFont.Bold)
+            sub_font = QFont("Microsoft YaHei", 11)
+            margins = (25, 22, 25, 22)
+            spacing = 10
+            title_h = 25
+            value_h = 60
+            sub_h = 25
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(25, 22, 25, 22)
-        layout.setSpacing(10)
+        layout.setContentsMargins(*margins)
+        layout.setSpacing(spacing)
 
         self.title_label = QLabel(title)
         self.title_label.setObjectName("cardTitle")
         self.title_label.setAlignment(Qt.AlignCenter)
-        self.title_label.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
-        self.title_label.setMinimumHeight(25)
+        self.title_label.setFont(title_font)
+        self.title_label.setMinimumHeight(title_h)
         layout.addWidget(self.title_label)
 
         self.value_label = QLabel("--")
         self.value_label.setObjectName("cardValue")
         self.value_label.setAlignment(Qt.AlignCenter)
-        self.value_label.setFont(QFont("Consolas", 38, QFont.Bold))
-        self.value_label.setMinimumHeight(60)
+        self.value_label.setFont(value_font)
+        self.value_label.setMinimumHeight(value_h)
         self.value_label.setWordWrap(False)
         layout.addWidget(self.value_label, 1)
 
         self.sub_label = QLabel("")
         self.sub_label.setObjectName("cardSub")
         self.sub_label.setAlignment(Qt.AlignCenter)
-        self.sub_label.setFont(QFont("Microsoft YaHei", 11))
-        self.sub_label.setMinimumHeight(25)
+        self.sub_label.setFont(sub_font)
+        self.sub_label.setMinimumHeight(sub_h)
         layout.addWidget(self.sub_label)
 
     def paintEvent(self, event):

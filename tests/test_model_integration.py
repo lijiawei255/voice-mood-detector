@@ -33,7 +33,7 @@ except ImportError:
     _torch_available = False
     sys.modules["torch"] = MagicMock()
 
-from model_config import is_model_downloaded, get_downloaded_models
+from app_paths import is_model_downloaded, load_model_config
 
 
 def _get_wav_files():
@@ -46,15 +46,16 @@ def _get_wav_files():
     return wav_files[:3]
 
 
-# 判断是否有任何模型已下载，且 torch 可用
-_any_model_downloaded = len(get_downloaded_models()) > 0 and _torch_available
+# 判断当前配置的模型是否已下载，且 torch 可用
+_current_model = load_model_config()
+_current_model_downloaded = is_model_downloaded(_current_model) and _torch_available
 _wav_files = _get_wav_files()
 
 
 class TestPredictFields(unittest.TestCase):
     """predict() 返回字段完整性测试"""
 
-    @unittest.skipIf(not _any_model_downloaded, "未检测到已下载的模型，跳过集成测试")
+    @unittest.skipIf(not _current_model_downloaded, "未检测到已下载的模型，跳过集成测试")
     def setUp(self):
         from emotion_recognizer import EmotionRecognizer
         self.recognizer = EmotionRecognizer()
@@ -73,7 +74,7 @@ class TestPredictFields(unittest.TestCase):
         if not self.recognizer.is_ready():
             self.skipTest(f"模型加载失败: {self._load_error or '超时'}")
 
-    @unittest.skipIf(not _any_model_downloaded, "未检测到已下载的模型，跳过集成测试")
+    @unittest.skipIf(not _current_model_downloaded, "未检测到已下载的模型，跳过集成测试")
     @unittest.skipIf(len(_wav_files) == 0, "未找到可用的 WAV 测试文件")
     def test_predict_returns_all_fields(self):
         """predict() 返回包含所有必需字段的字典"""
@@ -82,20 +83,25 @@ class TestPredictFields(unittest.TestCase):
         self.assertTrue(result.get("success", False),
                         f"predict() 失败: {result.get('error', '未知错误')}")
 
-        # 12 个必需字段（不含 success）
+        # 当前 predict() 返回的字段
         required_fields = [
             "主要情绪", "置信度",
             "所有情绪概率",
-            "情绪效价", "情绪唤醒度",
+            "完整概率_8类",
+            "原始模型输出",
             "情绪稳定度分数", "情绪状态等级", "等级颜色",
-            "情绪描述", "调节建议",
-            "混合情绪", "情绪时间线",
+            "稳定度分项",
+            "valence_score", "arousal_score", "dominance_score",
+            "negative_load", "emotional_uncertainty", "estimation_note",
+            "调节建议", "混合情绪",
+            "复合情绪", "复合情绪详情",
+            "情绪分析摘要",
         ]
         for field in required_fields:
             self.assertIn(field, result,
                           f"返回结果缺少字段: '{field}'")
 
-    @unittest.skipIf(not _any_model_downloaded, "未检测到已下载的模型，跳过集成测试")
+    @unittest.skipIf(not _current_model_downloaded, "未检测到已下载的模型，跳过集成测试")
     @unittest.skipIf(len(_wav_files) == 0, "未找到可用的 WAV 测试文件")
     def test_predict_field_types(self):
         """各字段的返回值类型正确"""
@@ -107,17 +113,28 @@ class TestPredictFields(unittest.TestCase):
         self.assertIsInstance(result["主要情绪"], str)
         self.assertIsInstance(result["置信度"], float)
         self.assertIsInstance(result["所有情绪概率"], dict)
-        self.assertIsInstance(result["情绪效价"], float)
-        self.assertIsInstance(result["情绪唤醒度"], float)
+        self.assertIsInstance(result["完整概率_8类"], dict)
+        self.assertIsInstance(result["原始模型输出"], dict)
         self.assertIsInstance(result["情绪稳定度分数"], float)
         self.assertIsInstance(result["情绪状态等级"], str)
         self.assertIsInstance(result["等级颜色"], str)
-        self.assertIsInstance(result["情绪描述"], str)
+        self.assertIsInstance(result["稳定度分项"], dict)
+        self.assertIsInstance(result["valence_score"], float)
+        self.assertIsInstance(result["arousal_score"], float)
+        self.assertIsInstance(result["dominance_score"], float)
+        self.assertIsInstance(result["negative_load"], float)
+        self.assertIsInstance(result["emotional_uncertainty"], float)
+        self.assertIsInstance(result["estimation_note"], str)
         self.assertIsInstance(result["调节建议"], str)
         self.assertIsInstance(result["混合情绪"], list)
-        self.assertIsInstance(result["情绪时间线"], list)
+        self.assertIsInstance(result["复合情绪"], str)
+        # 复合情绪详情可能为 dict 或 None
+        self.assertTrue(
+            result["复合情绪详情"] is None or isinstance(result["复合情绪详情"], dict)
+        )
+        self.assertIsInstance(result["情绪分析摘要"], str)
 
-    @unittest.skipIf(not _any_model_downloaded, "未检测到已下载的模型，跳过集成测试")
+    @unittest.skipIf(not _current_model_downloaded, "未检测到已下载的模型，跳过集成测试")
     @unittest.skipIf(len(_wav_files) == 0, "未找到可用的 WAV 测试文件")
     def test_predict_value_ranges(self):
         """数值范围约束验证"""
@@ -139,25 +156,29 @@ class TestPredictFields(unittest.TestCase):
         self.assertLessEqual(stability, 10.0,
                              f"稳定度 {stability} > 10")
 
-        # 效价 -1 ~ +1
-        valence = result["情绪效价"]
-        self.assertGreaterEqual(valence, -1.0,
-                                f"效价 {valence} < -1")
-        self.assertLessEqual(valence, 1.0,
-                             f"效价 {valence} > 1")
+        # VAD 分数范围
+        self.assertGreaterEqual(result["valence_score"], -1.0)
+        self.assertLessEqual(result["valence_score"], 1.0)
+        self.assertGreaterEqual(result["arousal_score"], 0.0)
+        self.assertLessEqual(result["arousal_score"], 1.0)
+        self.assertGreaterEqual(result["dominance_score"], 0.0)
+        self.assertLessEqual(result["dominance_score"], 1.0)
+        self.assertGreaterEqual(result["negative_load"], 0.0)
+        self.assertLessEqual(result["negative_load"], 1.0)
+        self.assertGreaterEqual(result["emotional_uncertainty"], 0.0)
+        self.assertLessEqual(result["emotional_uncertainty"], 1.0)
 
-        # 唤醒度 0-1
-        arousal = result["情绪唤醒度"]
-        self.assertGreaterEqual(arousal, 0.0,
-                                f"唤醒度 {arousal} < 0")
-        self.assertLessEqual(arousal, 1.0,
-                             f"唤醒度 {arousal} > 1")
+        # 8 类概率之和应接近 1
+        probs_8 = result["完整概率_8类"]
+        self.assertEqual(set(probs_8.keys()), set(result["所有情绪概率"].keys()) | {"其他"})
+        total_8 = sum(probs_8.values())
+        self.assertAlmostEqual(total_8, 1.0, places=1)
 
 
 class TestBatchPredictNoCrash(unittest.TestCase):
     """批量测试多个音频文件，确保无崩溃"""
 
-    @unittest.skipIf(not _any_model_downloaded, "未检测到已下载的模型，跳过集成测试")
+    @unittest.skipIf(not _current_model_downloaded, "未检测到已下载的模型，跳过集成测试")
     @unittest.skipIf(len(_wav_files) == 0, "未找到可用的 WAV 测试文件")
     def setUp(self):
         from emotion_recognizer import EmotionRecognizer
@@ -176,7 +197,7 @@ class TestBatchPredictNoCrash(unittest.TestCase):
         if not self.recognizer.is_ready():
             self.skipTest(f"模型加载失败: {self._load_error or '超时'}")
 
-    @unittest.skipIf(not _any_model_downloaded, "未检测到已下载的模型，跳过集成测试")
+    @unittest.skipIf(not _current_model_downloaded, "未检测到已下载的模型，跳过集成测试")
     @unittest.skipIf(len(_wav_files) == 0, "未找到可用的 WAV 测试文件")
     def test_batch_predict_no_crash(self):
         """批量测试：每个文件都不崩溃，返回字典"""

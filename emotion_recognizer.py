@@ -43,6 +43,13 @@ import threading
 import warnings
 import re
 
+# 引入科研评估所需模块（P0/P1/P2）
+from version import APP_VERSION, ALGORITHM_VERSION
+from audio_quality import AudioQualityAnalyzer, compute_audio_quality
+from audio_features import extract_acoustic_features, compute_psychological_indicators
+from reliability import get_reliability_level
+from baseline import PersonalBaseline
+
 # 忽略一些不必要的警告信息，保持输出整洁
 warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -851,8 +858,8 @@ class EmotionRecognizer:
         else:
             secondary_model = "emotion2vec_plus_base"  # seed 使用 base 作为对照
 
-        # 主模型预测
-        primary_result = self.predict(audio_path)
+        # 主模型预测（标记为科研模式）
+        primary_result = self.predict(audio_path, is_research_mode=True)
         if not primary_result.get('success'):
             return {"success": False, "error": f"主模型预测失败: {primary_result.get('error')}"}
 
@@ -888,18 +895,18 @@ class EmotionRecognizer:
             from reliability import evaluate_model_agreement
             agreement = evaluate_model_agreement(primary_result, secondary_result)
 
-            return {
-                "success": True,
-                "主要情绪": primary_result.get("主要情绪"),
-                "primary_result": primary_result,
-                "secondary_result": secondary_result,
+            # 以主模型结果为基础，叠加双模型验证信息，便于 GUI 直接展示
+            dual_result = dict(primary_result)
+            dual_result.update({
+                "is_dual_model": True,
                 "primary_model": self.model_name,
                 "secondary_model": secondary_model,
                 "model_agreement": agreement["agreement"],
                 "result_reliability": agreement["level"],
                 "model_agreement_note": agreement["note"],
-                "is_dual_model": True
-            }
+                "secondary_result": secondary_result,
+            })
+            return dual_result
 
         except Exception as e:
             logger.error(f"双模型预测失败: {e}")
@@ -942,7 +949,7 @@ class EmotionRecognizer:
 
         return "；".join(parts)
 
-    def predict(self, audio_path):
+    def predict(self, audio_path, is_research_mode=False):
         """
         对音频文件进行情绪识别推理
 
@@ -958,9 +965,12 @@ class EmotionRecognizer:
         6. 计算情绪稳定度分数和等级
         7. 生成调节建议
         8. 检测混合情绪
+        9. 评估音频质量、提取声学特征、计算心理状态指标
+        10. 评估综合可靠性并计算个人基线偏移（若已建立）
 
         参数：
             audio_path (str): 音频文件路径（WAV 格式，16kHz 单声道）
+            is_research_mode (bool): 是否为科研评估模式，会影响元数据标记
 
         返回值：
             dict: 识别结果字典，包含以下字段：
@@ -969,9 +979,19 @@ class EmotionRecognizer:
                 - 主要情绪 (str): 最主要的情绪类型
                 - 置信度 (float): 主要情绪的置信度（0-1）
                 - 所有情绪概率 (dict): 各情绪的概率分布
+                - 完整概率_8类 (dict): 含"其他"的完整 8 类概率
                 - 情绪稳定度分数 (float): 0-10分制稳定度评分
                 - 情绪状态等级 (str): 稳定度等级名称
                 - 等级颜色 (str): 等级对应的颜色代码
+                - 稳定度分项 (dict): 三因子分项得分
+                - valence_score (float): 效价估计值 [-1, 1]
+                - arousal_score (float): 唤醒度估计值 [0, 1]
+                - dominance_score (float): 掌控感估计值 [0, 1]
+                - audio_quality (dict): 音频质量评估结果
+                - acoustic_features (dict): 声学特征
+                - psychological_indicators (dict): 心理状态指标
+                - assessment_reliability (str): 综合可靠性等级
+                - baseline_deviation (dict): 相对个人基线的偏移
                 - 调节建议 (str): 个性化调节建议
                 - 混合情绪 (list): 混合情绪列表 [(情绪, 概率), ...]
         """
@@ -1121,6 +1141,71 @@ class EmotionRecognizer:
                 compound_emotion, stability_score, stability_level
             )
 
+            # =====================================================================
+            # P0/P1/P2 升级：完整评估流程集成
+            # =====================================================================
+            # 1. 音频质量评估（保证输入一致性）
+            audio_quality = None
+            try:
+                analyzer = AudioQualityAnalyzer(target_sr=16000)
+                audio_quality = analyzer.analyze(audio_path)
+            except Exception as e:
+                logger.warning(f"音频质量评估失败: {e}")
+
+            # 2. 声学特征提取（P1）
+            acoustic_features = None
+            try:
+                acoustic_features = extract_acoustic_features(audio_path, sr=16000)
+            except Exception as e:
+                logger.warning(f"声学特征提取失败: {e}")
+
+            # 3. 心理状态指标（P1）
+            psychological_indicators = {}
+            try:
+                vad_dims = {
+                    "valence_score": vad_dimensions["valence_score"],
+                    "arousal_score": vad_dimensions["arousal_score"],
+                    "dominance_score": vad_dimensions["dominance_score"],
+                    "negative_load": vad_dimensions["negative_load"],
+                    "emotional_uncertainty": vad_dimensions["emotional_uncertainty"],
+                }
+                psychological_indicators = compute_psychological_indicators(
+                    acoustic_features, vad_dims
+                )
+            except Exception as e:
+                logger.warning(f"心理状态指标计算失败: {e}")
+
+            # 4. 综合可靠性评分（P0/P1）
+            assessment_reliability = "中"
+            try:
+                reliability_assessment = {
+                    "audio_quality": audio_quality,
+                    "confidence": confidence,
+                    "consistency": None,  # 单次检测无多次采样一致性
+                }
+                assessment_reliability = get_reliability_level(reliability_assessment)
+            except Exception as e:
+                logger.warning(f"可靠性评估失败: {e}")
+
+            # 5. 个人基线偏移（P2）
+            baseline_deviation = {"available": False, "note": "基线尚未建立"}
+            try:
+                baseline_mgr = PersonalBaseline()
+                if baseline_mgr.is_established():
+                    baseline_deviation = baseline_mgr.compute_deviation({
+                        "主要情绪": main_emotion,
+                        "置信度": confidence,
+                        "情绪稳定度分数": stability_score,
+                        "valence_score": vad_dimensions["valence_score"],
+                        "arousal_score": vad_dimensions["arousal_score"],
+                        "dominance_score": vad_dimensions["dominance_score"],
+                        "negative_load": vad_dimensions["negative_load"],
+                        "emotional_uncertainty": vad_dimensions["emotional_uncertainty"],
+                        "acoustic_features": acoustic_features or {},
+                    })
+            except Exception as e:
+                logger.warning(f"基线偏移计算失败: {e}")
+
             return {
                 "success": True,
                 "主要情绪": main_emotion,
@@ -1156,7 +1241,18 @@ class EmotionRecognizer:
                 "混合情绪": mixed_emotions,
                 "复合情绪": compound_emotion.get("name", "") if compound_emotion else "",
                 "复合情绪详情": compound_emotion if compound_emotion else None,
-                "情绪分析摘要": emotion_summary
+                "情绪分析摘要": emotion_summary,
+                # P0/P1/P2 新增：音频质量、声学特征、心理状态指标、可靠性、基线
+                "audio_quality": audio_quality if audio_quality else {},
+                "acoustic_features": acoustic_features if acoustic_features else {},
+                "psychological_indicators": psychological_indicators,
+                "assessment_reliability": assessment_reliability,
+                "baseline_deviation": baseline_deviation,
+                # 科研元数据（可复现性）
+                "model_name": self.model_name,
+                "algorithm_version": ALGORITHM_VERSION,
+                "app_version": APP_VERSION,
+                "is_research_mode": bool(is_research_mode),
             }
 
         except torch.cuda.OutOfMemoryError:
