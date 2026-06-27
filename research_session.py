@@ -246,7 +246,7 @@ class ResearchSession:
 
                 _report(
                     "record",
-                    f"第 {i+1}/{n_samples} 段录音：请按提示语朗读（建议 {self.RESEARCH_MIN_DURATION}-{self.RESEARCH_MAX_DURATION} 秒，最短 {int(AUDIO_QUALITY_THRESHOLDS.get('research_min_duration', 3.0))} 秒）",
+                    f"第 {i+1}/{n_samples} 段录音：请按提示语朗读（建议 {self.RESEARCH_MIN_DURATION}-{self.RESEARCH_MAX_DURATION} 秒，最短 {int(AUDIO_QUALITY_THRESHOLDS.get('research_min_duration', 10.0))} 秒）",
                     10 + (i + 1) * 20 // n_samples,
                 )
 

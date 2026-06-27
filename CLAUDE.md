@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Environment
 
 ```bash
-# Create and activate an Anaconda environment (recommended)
-conda create -n voice_mood python=3.10 -y
-conda activate voice_mood
+# Create and activate an Anaconda environment (recommended, named `audio`)
+conda create -n audio python=3.10 -y
+conda activate audio
 
 # Install libraries that need local compilation (PyAudio) via conda first
 conda install -c conda-forge pyaudio -y
@@ -32,8 +32,9 @@ python main.py
 # Run all tests
 python -m pytest tests/ -v
 
-# Latest status (standalone Python 3.11 without PyQt5): 150 passed, 10 skipped
-# (With PyQt5 installed, the 10 GUI-skipped tests also run.)
+# Latest status:
+#   - With PyQt5 installed (anaconda `audio` env): 153 passed, 7 skipped
+#   - Headless/CI without PyQt5: ~150 passed, 10 skipped (GUI tests auto-skip)
 
 # Run a single test
 python -m pytest tests/test_emotion.py -v
@@ -128,7 +129,7 @@ MainWindow (1500×1000 default)
 - Keep CPU-only inference path robust; do not assume GPU availability.
 - Maintain the test suite when adding backend fields or GUI cards.
 - Avoid adding heavy runtime dependencies; prefer librosa + parselmouth over proprietary toolkits.
-- When modifying GUI layouts, run `python tests/capture_screenshots.py` (requires display) and inspect `portable_data/temp/screenshots/`.
+- When modifying GUI layouts, capture screenshots manually via the running app (requires a display) and inspect `portable_data/temp/screenshots/`.
 
 ## Git Workflow
 

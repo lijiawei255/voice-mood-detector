@@ -45,7 +45,9 @@ AUDIO_QUALITY_THRESHOLDS = {
     "max_clipping_ratio": 0.05,    # 最大爆音比例 — fatal
     "max_noise_level": 0.6,        # 最大噪声水平 — warning（对真实底噪宽容）
     "min_rms": 0.003,              # 最小RMS音量 — warning
-    "research_min_duration": 3.0,  # 科研模式最小时长（秒）— fatal
+    # 科研模式最小时长对齐 UI 建议（RESEARCH_MIN_DURATION=10 秒）：过短会导致
+    # 声学特征（jitter/shimmer/HNR）估计不稳定。仅 fatal 才阻断流程。
+    "research_min_duration": 10.0,  # 科研模式最小时长（秒）— fatal
     "research_max_duration": 30.0, # 科研模式最大时长（秒）— fatal
 }
 
@@ -342,7 +344,10 @@ def compute_audio_quality(filepath):
         speech_score = min(1.0, speech_ratio / 0.6)
         clip_score = max(0.0, 1.0 - clipping_ratio / AUDIO_QUALITY_THRESHOLDS["max_clipping_ratio"])
         noise_score = max(0.0, 1.0 - noise_level / AUDIO_QUALITY_THRESHOLDS["max_noise_level"])
-        rms_ideal = 0.1
+        # rms_score 的理想值须与 normalize_volume 的 target_rms(0.15) 一致，
+        # 否则归一化后的音频 rms_score 会被系统性低估（曾因 0.1 vs 0.15 不匹配
+        # 导致 quality_score 偏低，进而拉低可靠性评级）。
+        rms_ideal = 0.15
         rms_score = max(0.0, 1.0 - abs(rms - rms_ideal) / rms_ideal)
 
         quality_score = (

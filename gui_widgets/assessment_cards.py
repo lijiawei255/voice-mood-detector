@@ -114,7 +114,7 @@ class AcousticFeatureCard(_MinimalCard):
                     self.shimmer_row, self.hnr_row, self.rate_row, self.silence_row]:
             layout.addWidget(row)
 
-        note = QLabel("声带特征需要安装 praat-parselmouth 以获得专业级精度")
+        note = QLabel("声带音质指标（Jitter / Shimmer / HNR）默认由 praat-parselmouth（Praat 算法，临床语音分析金标准）提取；未安装时将自动降级为 librosa 近似，精度较低。")
         note.setFont(QFont(UI_FONT, 10))
         note.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
         note.setWordWrap(True)

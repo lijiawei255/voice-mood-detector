@@ -223,9 +223,9 @@ cd Voice_Mood_Detect
 本项目依赖 PyQt5、librosa、PyTorch、funasr 等，**强烈建议使用 Anaconda 创建独立环境**，可避免依赖冲突与 PyAudio 编译失败等问题：
 
 ```bash
-# 创建名为 voice_mood 的环境（Python 3.10 已测试通过，3.8~3.11 均可）
-conda create -n voice_mood python=3.10 -y
-conda activate voice_mood
+# 创建名为 audio 的环境（Python 3.10 已测试通过，3.8~3.11 均可）
+conda create -n audio python=3.10 -y
+conda activate audio
 
 # 优先用 conda 安装需要本地编译的库（PyAudio）
 conda install -c conda-forge pyaudio -y
@@ -234,11 +234,13 @@ conda install -c conda-forge pyaudio -y
 3. **安装其余依赖**
 
 ```bash
-# 确保仍在刚创建的 voice_mood 环境中
+# 确保仍在刚创建的 audio 环境中
 pip install -r requirements.txt
 ```
 
 > 💡 **提示**：若 `pip install` 时 PyAudio 仍报错，请用上一步的 `conda install -c conda-forge pyaudio` 单独安装，再重新 `pip install -r requirements.txt`。
+
+> 🔬 **声带音质分析**：jitter / shimmer / HNR 等声带音质特征默认使用 **praat-parselmouth**（Praat 算法，临床语音分析金标准）提取；若未安装则自动降级为 librosa 近似（精度较低）。`praat-parselmouth>=0.4.0` 已包含在 `requirements.txt` 中。
 
 ### 运行程序
 
@@ -294,7 +296,7 @@ python main.py
 - **复合情绪**：由基础情绪组合而成的高级情绪状态
 - **VAD 维度**：效价(Valence)、唤醒度(Arousal)、掌控感(Dominance)、负性负荷
 - **稳定度因子**：负面加权、情绪分散度(熵)、极端度三因子分项
-- **声学特征**：F0、jitter、shimmer、HNR、语速、静音比等
+- **声学特征**：F0、jitter、shimmer、HNR、语速、静音比等（声带音质指标由 praat-parselmouth 提取专业级精度）
 - **心理状态指标**：压力、焦虑、低落倾向、情绪激活度、语音稳定性（非临床诊断）
 - **可靠性**：综合音频质量、置信度与一致性的高/中/低评级
 - **个人基线偏移**：相对已建立个人基线的 z-score 偏移
@@ -367,7 +369,7 @@ Voice_Mood_Detect/
 ├── research_session.py     # 科研模式流程编排（多采样 / 质量门控 / 双模型验证）
 ├── recorder.py             # 音频录制：线程化录音 + WAV 保存
 ├── history_manager.py      # 历史管理：原子写入 + 数据清洗
-├── audio_features.py       # 声学特征提取（F0 / jitter / shimmer / HNR / MFCC）
+├── audio_features.py       # 声学特征提取（F0 / jitter / shimmer / HNR / MFCC，via praat-parselmouth）
 ├── audio_quality.py        # 音频质量分析（音量 / 噪声 / 爆音 / 有效语音比）
 ├── baseline.py             # 个人基线建模与偏移评估
 ├── reliability.py          # 评估可靠性（ICC / 多采样一致性 / 模型一致性）
@@ -485,8 +487,8 @@ git clone https://github.com/lijiawei255/voice-mood-detector.git
 cd Voice_Mood_Detect
 
 # 创建 Anaconda 虚拟环境（与快速开始一致）
-conda create -n voice_mood python=3.10 -y
-conda activate voice_mood
+conda create -n audio python=3.10 -y
+conda activate audio
 conda install -c conda-forge pyaudio -y
 
 # 安装开发依赖（含运行依赖）

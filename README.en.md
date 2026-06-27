@@ -224,9 +224,9 @@ cd Voice_Mood_Detect
 This project depends on PyQt5, librosa, PyTorch, funasr, etc. **Using Anaconda to create an isolated environment is strongly recommended** to avoid dependency conflicts and PyAudio build failures:
 
 ```bash
-# Create an environment named voice_mood (Python 3.10 tested; 3.8~3.11 all work)
-conda create -n voice_mood python=3.10 -y
-conda activate voice_mood
+# Create an environment named audio (Python 3.10 tested; 3.8~3.11 all work)
+conda create -n audio python=3.10 -y
+conda activate audio
 
 # Install libraries that require local compilation (PyAudio) via conda first
 conda install -c conda-forge pyaudio -y
@@ -235,11 +235,13 @@ conda install -c conda-forge pyaudio -y
 3. **Install the remaining dependencies**
 
 ```bash
-# Make sure you are still in the voice_mood environment
+# Make sure you are still in the audio environment
 pip install -r requirements.txt
 ```
 
 > 💡 **Tip**: If `pip install` still fails on PyAudio, install it separately with `conda install -c conda-forge pyaudio` above, then re-run `pip install -r requirements.txt`.
+
+> 🔬 **Vocal-quality analysis**: Vocal-quality features such as jitter / shimmer / HNR are extracted by **praat-parselmouth** (Praat algorithms, the clinical gold standard for voice analysis) by default; if it is not installed, a lower-accuracy librosa approximation is used automatically. `praat-parselmouth>=0.4.0` is already listed in `requirements.txt`.
 
 ### Run the Program
 
@@ -295,7 +297,7 @@ python main.py
 - **Compound Emotions**: Higher-order emotional states composed of basic emotions
 - **VAD Dimensions**: Valence, Arousal, Dominance, and Negative Load
 - **Stability Factors**: Negative weight, emotion dispersion (entropy), and extremity sub-scores
-- **Acoustic Features**: F0, jitter, shimmer, HNR, speech rate, silence ratio, etc.
+- **Acoustic Features**: F0, jitter, shimmer, HNR, speech rate, silence ratio, etc. (vocal-quality metrics extracted by praat-parselmouth for clinical-grade accuracy)
 - **Psychological Indicators**: Stress, anxiety, depression tendency, activation, speech stability (non-clinical)
 - **Reliability**: High/Medium/Low rating combining audio quality, confidence, and consistency
 - **Baseline Deviation**: z-score deviation relative to an established personal baseline
@@ -368,7 +370,7 @@ Voice_Mood_Detect/
 ├── research_session.py     # Research-mode orchestration (multi-sample / quality gate / dual-model)
 ├── recorder.py             # Audio recording: threaded recording + WAV save
 ├── history_manager.py      # History management: atomic write + data sanitization
-├── audio_features.py       # Acoustic feature extraction (F0 / jitter / shimmer / HNR / MFCC)
+├── audio_features.py       # Acoustic feature extraction (F0 / jitter / shimmer / HNR / MFCC, via praat-parselmouth)
 ├── audio_quality.py        # Audio quality analysis (volume / noise / clipping / speech ratio)
 ├── baseline.py             # Personal baseline modeling and deviation assessment
 ├── reliability.py          # Assessment reliability (ICC / multi-sample / model agreement)
@@ -486,9 +488,9 @@ git clone https://github.com/lijiawei255/voice-mood-detector.git
 cd Voice_Mood_Detect
 
 # Create virtual environment
-# Create an Anaconda virtual environment (same as Quick Start)
-conda create -n voice_mood python=3.10 -y
-conda activate voice_mood
+# Create an Anaconda environment (same as Quick Start)
+conda create -n audio python=3.10 -y
+conda activate audio
 conda install -c conda-forge pyaudio -y
 
 # Install development dependencies (includes runtime deps)
