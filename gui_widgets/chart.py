@@ -107,7 +107,7 @@ class MplCanvas(FigureCanvas):
             if not records:
                 self.fig.set_facecolor('#F2EDE4')
                 self.axes.set_facecolor('#F2EDE4')
-                self.axes.set_title("情绪稳定度变化趋势", fontsize=13, fontweight='bold', pad=12, loc='left')
+                self.axes.set_title("■ 情绪稳定度变化趋势", fontsize=13, fontweight='bold', pad=12, loc='left')
                 self.axes.set_ylabel("情绪稳定度 (0-10)", fontsize=10, fontweight='bold', labelpad=10)
                 self.axes.set_ylim(0, 10)
                 self.axes.grid(True, alpha=0.4, linestyle='-', linewidth=1, zorder=1)
@@ -155,7 +155,7 @@ class MplCanvas(FigureCanvas):
 
             # x 轴标签：使用日期时间
             # 构成主义标题：红底白字风格（通过背景色块模拟）
-            self.axes.set_title("▮ 情绪稳定度变化趋势", fontsize=14, fontweight='bold', pad=15, loc='left',
+            self.axes.set_title("■ 情绪稳定度变化趋势", fontsize=14, fontweight='bold', pad=15, loc='left',
                                color='#2B2B2B')
             self.axes.set_ylabel("稳定度 (0–10)", fontsize=10, fontweight='bold', labelpad=10,
                                color='#2B2B2B')
@@ -170,10 +170,10 @@ class MplCanvas(FigureCanvas):
                 for ts in timestamps:
                     try:
                         dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
-                        date_labels.append(dt.strftime("%m-%d %H:%M"))
+                        date_labels.append(dt.strftime("%m/%d\n%H:%M"))
                     except (ValueError, TypeError):
                         date_labels.append(ts[-8:] if ts else "")
-                self.axes.set_xticklabels(date_labels, rotation=45, ha='right', fontsize=8)
+                self.axes.set_xticklabels(date_labels, rotation=0, ha='center', fontsize=7)
             elif n <= 40:
                 step = max(1, n // 10)
                 tick_positions = x[::step]
@@ -181,31 +181,31 @@ class MplCanvas(FigureCanvas):
                 for i in range(0, n, step):
                     try:
                         dt = datetime.strptime(timestamps[i], "%Y-%m-%d %H:%M:%S")
-                        tick_labels.append(dt.strftime("%m-%d %H:%M"))
+                        tick_labels.append(dt.strftime("%m/%d %H:%M"))
                     except (ValueError, TypeError):
                         tick_labels.append("")
                 self.axes.set_xticks(tick_positions)
-                self.axes.set_xticklabels(tick_labels, rotation=45, ha='right', fontsize=8)
+                self.axes.set_xticklabels(tick_labels, rotation=30, ha='right', fontsize=7)
             else:
                 tick_positions = [x[0], x[n//4], x[n//2], x[3*n//4], x[-1]]
                 tick_labels = []
                 for idx in [0, n//4, n//2, 3*n//4, n-1]:
                     try:
                         dt = datetime.strptime(timestamps[idx], "%Y-%m-%d %H:%M:%S")
-                        tick_labels.append(dt.strftime("%m-%d %H:%M"))
+                        tick_labels.append(dt.strftime("%m/%d %H:%M"))
                     except (ValueError, TypeError):
                         tick_labels.append("")
                 self.axes.set_xticks(tick_positions)
-                self.axes.set_xticklabels(tick_labels, rotation=45, ha='right', fontsize=8)
+                self.axes.set_xticklabels(tick_labels, rotation=30, ha='right', fontsize=7)
 
             self.axes.set_xlabel("", fontsize=10, labelpad=10)
 
             # 图例
             self._draw_legend()
 
-            # 布局调整
+            # 布局调整 — 增加底部空间防止 x 轴标签被截断
             self.fig.tight_layout(pad=2.5)
-            self.fig.subplots_adjust(bottom=0.20, left=0.10, right=0.95, top=0.88)
+            self.fig.subplots_adjust(bottom=0.25, left=0.10, right=0.95, top=0.88)
             self.draw()
         except Exception as e:
             logger.error(f"绘图失败: {str(e)}", exc_info=True)

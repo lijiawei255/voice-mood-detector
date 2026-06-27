@@ -209,17 +209,32 @@ class ResultCardWidget(QFrame):
         layout.addWidget(factors_label)
 
         factors_row = QHBoxLayout()
-        factors_row.setSpacing(10)
+        factors_row.setSpacing(8)
         for name, key in [("负面加权", "negative"), ("熵分散度", "entropy"), ("极端度", "extremity")]:
             fframe = self._make_sub_card(name)
             flay = QVBoxLayout(fframe)
-            flay.setContentsMargins(8, 4, 8, 4)
+            flay.setContentsMargins(6, 6, 6, 6)
+            flay.setSpacing(4)
+            # 因子名称标签
+            name_lbl = QLabel(name)
+            name_lbl.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
+            name_lbl.setAlignment(Qt.AlignCenter)
+            name_lbl.setStyleSheet("color: #8A8580; font-weight: bold;")
+            flay.addWidget(name_lbl)
+            # 因子数值
             val = QLabel("--")
-            val.setFont(QFont("Consolas", 18, QFont.Bold))
+            val.setFont(QFont("Consolas", 16, QFont.Bold))
             val.setAlignment(Qt.AlignCenter)
             val.setStyleSheet("color: #2B2B2B;")
             flay.addWidget(val)
             setattr(self, f"factor_{key}_value", val)
+            # 添加tooltip说明
+            tooltips = {
+                "负面加权": "负性情绪占比越高，分数越大",
+                "熵分散度": "情绪分布越分散，分数越大",
+                "极端度": "单类概率越极端，分数越大"
+            }
+            fframe.setToolTip(tooltips.get(name, ""))
             factors_row.addWidget(fframe)
         layout.addLayout(factors_row)
 

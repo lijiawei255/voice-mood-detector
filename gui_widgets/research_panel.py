@@ -30,35 +30,35 @@ except ImportError:
 
 class ResearchRadarChart(QWidget):
     """
-    VAD 维度雷达图
+    VAD 维度柱状图
 
-    使用 matplotlib 绘制 Valence-Arousal-Dominance 三维雷达图，
-    叠加负性负荷和情绪不确定性作为参考指标。
+    使用 matplotlib 绘制 Valence-Arousal-Dominance 等维度的水平柱状图，
+    比雷达图更清晰易读，支持直接比较各维度数值。
     """
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(280, 280)
+        self.setMinimumSize(280, 240)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._values = {"valence": 0, "arousal": 0, "dominance": 0}
 
         if MATPLOTLIB_AVAILABLE:
-            self.figure = Figure(figsize=(3, 3), dpi=80)
+            self.figure = Figure(figsize=(4, 2.8), dpi=100)
             self.figure.patch.set_facecolor('#F2EDE4')
             self.canvas = FigureCanvas(self.figure)
-            self.ax = self.figure.add_subplot(111, polar=True)
+            self.ax = self.figure.add_subplot(111)
             layout = QVBoxLayout(self)
             layout.setContentsMargins(0, 0, 0, 0)
             layout.addWidget(self.canvas)
         else:
             layout = QVBoxLayout(self)
-            label = QLabel("matplotlib 不可用\n无法显示雷达图")
+            label = QLabel("matplotlib 不可用\n无法显示图表")
             label.setAlignment(Qt.AlignCenter)
             label.setStyleSheet("color: #8A8580;")
             layout.addWidget(label)
 
     def update_values(self, valence, arousal, dominance, negative_load=0, uncertainty=0):
-        """更新雷达图数据"""
+        """更新柱状图数据"""
         self._values = {"valence": valence, "arousal": arousal,
                         "dominance": dominance, "negative_load": negative_load,
                         "uncertainty": uncertainty}
@@ -66,61 +66,75 @@ class ResearchRadarChart(QWidget):
             self._draw()
 
     def _draw(self):
-        """绘制雷达图 — 构成主义风格"""
+        """绘制水平柱状图 — 构成主义风格"""
         self.ax.clear()
 
         import numpy as np
 
-        categories = ['效价\nValence', '唤醒度\nArousal', '掌控感\nDominance',
-                      '负性负荷\nNeg.Load', '不确定性\nUncertainty']
+        # 维度名称和数值
+        categories = ['效价 (Valence)', '唤醒度 (Arousal)', '掌控感 (Dominance)',
+                      '负性负荷 (Neg.Load)', '不确定性 (Uncertainty)']
 
-        # 效价范围 -1~1，需要映射到 0~1
-        valence_mapped = (self._values['valence'] + 1) / 2
+        # 效价范围 -1~1，映射到 -1~1（保持原始尺度以显示正负方向）
         values = [
-            valence_mapped,
-            self._values['arousal'],
-            self._values['dominance'],
-            self._values['negative_load'],
-            self._values['uncertainty']
+            self._values['valence'],        # -1 ~ 1
+            self._values['arousal'],         # 0 ~ 1
+            self._values['dominance'],       # 0 ~ 1
+            self._values['negative_load'],   # 0 ~ 1
+            self._values['uncertainty']      # 0 ~ 1
         ]
 
-        N = len(categories)
-        angles = [n / float(N) * 2 * np.pi for n in range(N)]
-        angles += angles[:1]
+        # 水平柱状图（从下到上显示）
+        y_pos = np.arange(len(categories))
+        bar_colors = ['#C44B4F', '#C44B4F', '#C44B4F', '#2B2B2B', '#8A8580']
 
-        values_plot = values + values[:1]
+        # 对于效价（可能为负值），使用双向条
+        bars = self.ax.barh(y_pos, values, height=0.6, color=bar_colors,
+                           edgecolor='#2B2B2B', linewidth=2, zorder=3,
+                           alpha=0.85)
 
-        # 绘制
-        self.ax.set_theta_offset(np.pi / 2)
-        self.ax.set_theta_direction(-1)
+        # 效价零点参考线
+        self.ax.axvline(x=0, color='#2B2B2B', linewidth=1.5, linestyle='-', alpha=0.5, zorder=2)
 
-        self.ax.set_xticks(angles[:-1])
-        self.ax.set_xticklabels(categories, fontsize=9, color='#2B2B2B', fontweight='bold',
-                                fontfamily='sans-serif')
+        # 标签
+        self.ax.set_yticks(y_pos)
+        self.ax.set_yticklabels(categories, fontsize=9, color='#2B2B2B', fontweight='bold')
+        self.ax.set_xlim(-1.05, 1.05)
+        self.ax.set_xticks([-1.0, -0.5, 0, 0.5, 1.0])
+        self.ax.set_xticklabels(['-1.0', '-0.5', '0', '0.5', '1.0'], fontsize=8, color='#2B2B2B')
+        self.ax.set_xlabel("", fontsize=9, color='#2B2B2B')
 
-        self.ax.set_ylim(0, 1)
-        self.ax.set_yticks([0.2, 0.4, 0.6, 0.8])
-        self.ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8'], fontsize=8, color='#2B2B2B',
-                                fontweight='bold')
-        self.ax.set_rlabel_position(30)
+        # 数值标注
+        for i, (v, c) in enumerate(zip(values, categories)):
+            if v >= 0:
+                x_pos = v + 0.04
+                ha = 'left'
+            else:
+                x_pos = v - 0.04
+                ha = 'right'
+            self.ax.text(x_pos, i, f'{v:+.2f}', va='center', ha=ha,
+                         fontsize=8, fontweight='bold', color='#2B2B2B', zorder=4)
 
-        # 网格线 - 构成主义粗线风格
-        self.ax.yaxis.grid(True, color='#2B2B2B', linewidth=1.5, linestyle='-', alpha=0.6)
-        self.ax.xaxis.grid(True, color='#2B2B2B', linewidth=1.5, linestyle='-', alpha=0.6)
-
-        # 填充区域 + 粗线边框
-        self.ax.fill(angles, values_plot, alpha=0.3, color='#C44B4F')
-        self.ax.plot(angles, values_plot, linewidth=3, color='#C44B4F', solid_capstyle='round')
-
+        # 构成主义风格装饰
         self.ax.set_facecolor('#F2EDE4')
-        self.ax.spines['polar'].set_color('#2B2B2B')
-        self.ax.spines['polar'].set_linewidth(2.5)
+        self.ax.spines['top'].set_visible(False)
+        self.ax.spines['right'].set_visible(False)
+        self.ax.spines['left'].set_color('#2B2B2B')
+        self.ax.spines['left'].set_linewidth(2)
+        self.ax.spines['bottom'].set_color('#2B2B2B')
+        self.ax.spines['bottom'].set_linewidth(2)
+        self.ax.tick_params(axis='y', length=0)
+        self.ax.grid(True, axis='x', alpha=0.3, linestyle='-', linewidth=1, color='#2B2B2B', zorder=1)
 
+        # 标题
+        self.ax.set_title("情感维度指标", fontsize=11, fontweight='bold', pad=10, color='#2B2B2B', loc='left')
+
+        self.figure.tight_layout(pad=1.5)
         self.canvas.draw()
 
 
 class ExportToolbar(QWidget):
-    """数据导出工具栏"""
+    """数据导出工具栏 — 支持 CSV (SPSS/Excel) 和 JSON (完整科研数据) 两种格式"""
 
     export_csv_clicked = pyqtSignal()
     export_json_clicked = pyqtSignal()
@@ -128,45 +142,49 @@ class ExportToolbar(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
+        layout.setContentsMargins(0, 4, 0, 4)
+        layout.setSpacing(10)
 
-        title = QLabel("导出研究数据：")
-        title.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
-        title.setStyleSheet("color: #2B2B2B;")
+        title = QLabel("■ 导出研究数据：")
+        title.setFont(QFont("Microsoft YaHei", 11, QFont.Black))
+        title.setStyleSheet("color: #2B2B2B; padding: 4px 0;")
         layout.addWidget(title)
 
-        csv_btn = QPushButton("导出 CSV")
-        csv_btn.setFont(QFont("Microsoft YaHei", 10))
-        csv_btn.setMinimumHeight(32)
+        csv_btn = QPushButton("导出 CSV (Excel/SPSS)")
+        csv_btn.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
+        csv_btn.setMinimumHeight(36)
+        csv_btn.setToolTip("导出为 UTF-8 CSV 格式，可在 Excel/SPSS 中直接打开\n包含所有数值型指标和质量评估数据")
         csv_btn.setStyleSheet("""
             QPushButton {
                 background-color: #F2EDE4;
                 border: 2px solid #2B2B2B;
-                padding: 4px 16px;
+                padding: 6px 18px;
                 color: #2B2B2B;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #E8E3DA;
+                background-color: #C44B4F;
+                color: #FFFFFF;
             }
         """)
         csv_btn.clicked.connect(self.export_csv_clicked.emit)
         layout.addWidget(csv_btn)
 
-        json_btn = QPushButton("导出 JSON")
-        json_btn.setFont(QFont("Microsoft YaHei", 10))
-        json_btn.setMinimumHeight(32)
+        json_btn = QPushButton("导出 JSON (完整数据)")
+        json_btn.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
+        json_btn.setMinimumHeight(36)
+        json_btn.setToolTip("导出为 JSON 格式，包含原始模型输出、完整概率分布等全部字段\n适合科研复算和深度分析")
         json_btn.setStyleSheet("""
             QPushButton {
-                background-color: #F2EDE4;
+                background-color: #2B2B2B;
                 border: 2px solid #2B2B2B;
-                padding: 4px 16px;
-                color: #2B2B2B;
+                padding: 6px 18px;
+                color: #FFFFFF;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #E8E3DA;
+                background-color: #C44B4F;
+                color: #FFFFFF;
             }
         """)
         json_btn.clicked.connect(self.export_json_clicked.emit)

@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # CSV 导出字段列表（按逻辑分组排列）
 CSV_FIELDS = [
     # 基本信息
-    "id", "timestamp",
+    "id", "timestamp", "recording_duration",
     # 主要结果
     "main_emotion", "confidence", "stability_score", "stability_level",
     # 稳定度分项
@@ -32,11 +32,13 @@ CSV_FIELDS = [
     # VAD 维度
     "valence_score", "arousal_score", "dominance_score",
     "negative_load", "emotional_uncertainty",
+    "estimation_note",
     # 复合情绪
-    "compound_emotion",
-    # 音频质量
+    "compound_emotion", "compound_emotion_description",
+    # 音频质量（完整）
     "audio_quality_score", "audio_quality_label", "speech_ratio",
     "rms_mean", "noise_level", "clipping_ratio",
+    "audio_quality_issues",
     # 元数据
     "model_name", "algorithm_version", "app_version",
     "is_research_mode", "assessment_reliability",
@@ -88,9 +90,19 @@ def _build_csv_row(record):
     if not isinstance(audio_q, dict):
         audio_q = {}
 
+    # 录音时长：从 audio_quality 中获取，或从 audio_file 推断
+    duration = audio_q.get('duration', '')
+    if not duration:
+        duration = record.get('duration', '')
+
+    # 音频质量问题列表
+    issues = audio_q.get('issues', [])
+    issues_str = '; '.join(issues) if issues else ''
+
     return {
         "id": record.get('id', ''),
         "timestamp": record.get('timestamp', ''),
+        "recording_duration": duration,
         "main_emotion": record.get('main_emotion', ''),
         "confidence": record.get('confidence', 0),
         "stability_score": record.get('anxiety_score', 0),
@@ -103,13 +115,16 @@ def _build_csv_row(record):
         "dominance_score": record.get('dominance_score', ''),
         "negative_load": record.get('negative_load', ''),
         "emotional_uncertainty": record.get('emotional_uncertainty', ''),
+        "estimation_note": record.get('estimation_note', ''),
         "compound_emotion": record.get('compound_emotion', ''),
+        "compound_emotion_description": (record.get('compound_emotion_detail', {}) or {}).get('description', ''),
         "audio_quality_score": audio_q.get('quality_score', ''),
         "audio_quality_label": audio_q.get('quality_label', ''),
         "speech_ratio": audio_q.get('speech_ratio', ''),
         "rms_mean": audio_q.get('rms_mean', ''),
         "noise_level": audio_q.get('noise_level', ''),
         "clipping_ratio": audio_q.get('clipping_ratio', ''),
+        "audio_quality_issues": issues_str,
         "model_name": record.get('model_name', ''),
         "algorithm_version": record.get('algorithm_version', ''),
         "app_version": record.get('app_version', ''),

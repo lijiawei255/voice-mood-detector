@@ -978,9 +978,10 @@ class MainWindow(QMainWindow):
 
         header_frame = QFrame()
         header_frame.setObjectName("headerFrame")
-        header_frame.setMinimumHeight(70)
+        header_frame.setMinimumHeight(80)
+        header_frame.setMaximumHeight(100)
         header_layout = QHBoxLayout(header_frame)
-        header_layout.setContentsMargins(25, 12, 25, 12)
+        header_layout.setContentsMargins(20, 8, 20, 8)
 
         # 标题左侧大型红色楔形块（构成主义标志性元素）
         title_accent = QLabel()
@@ -994,8 +995,10 @@ class MainWindow(QMainWindow):
         header_layout.addWidget(sep)
 
         title_label = QLabel("■ 语音情绪识别系统")
-        title_label.setFont(QFont("Microsoft YaHei", 30, QFont.Black))
+        title_label.setFont(QFont("Microsoft YaHei", 22, QFont.Black))
         title_label.setObjectName("headerTitle")
+        title_label.setMinimumWidth(380)
+        title_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         header_layout.addWidget(title_label)
         header_layout.addStretch()
 
@@ -1357,11 +1360,17 @@ class MainWindow(QMainWindow):
         right_panel = QFrame()
         right_panel.setObjectName("rightPanel")
         right_layout = QVBoxLayout(right_panel)
-        right_layout.setSpacing(12)
-        right_layout.setContentsMargins(5, 5, 5, 5)
+        right_layout.setSpacing(8)
+        right_layout.setContentsMargins(2, 5, 2, 5)
+        # 右侧面板使用滚动区域确保所有内容可见
+        guide_scroll = QScrollArea()
+        guide_scroll.setWidgetResizable(True)
+        guide_scroll.setFrameShape(QFrame.NoFrame)
+        guide_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        guide_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
         quick_guide = QGroupBox("▸ 快速指南")
-        quick_guide.setFont(QFont("Microsoft YaHei", 12, QFont.Black))
+        quick_guide.setFont(QFont("Microsoft YaHei", 11, QFont.Black))
         quick_guide.setObjectName("guideGroup")
         quick_guide.setStyleSheet("""
             QGroupBox#guideGroup {
@@ -1383,36 +1392,36 @@ class MainWindow(QMainWindow):
             }
         """)
         guide_layout = QVBoxLayout(quick_guide)
-        guide_layout.setContentsMargins(15, 25, 15, 15)
-        guide_layout.setSpacing(10)
+        guide_layout.setContentsMargins(12, 25, 12, 15)
+        guide_layout.setSpacing(8)
 
         # 使用流程 - 红色标题条
         steps_title = QLabel("▸ 使用流程")
-        steps_title.setFont(QFont("Microsoft YaHei", 11, QFont.Black))
-        steps_title.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 8px 14px; font-weight: 900; border: 2px solid #2B2B2B;")
+        steps_title.setFont(QFont("Microsoft YaHei", 10, QFont.Black))
+        steps_title.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 6px 12px; font-weight: 900; border: 2px solid #2B2B2B;")
         guide_layout.addWidget(steps_title)
 
         steps_text = QLabel(
-            "<div style='line-height: 2.2; font-size: 10.5pt; color: #2B2B2B;'>"
-            "<div style='background: #F2EDE4; padding: 8px 14px; margin: 3px 0; "
-            "border-left: 8px solid #C44B4F;'>"
-            "<b style='color: #C44B4F; font-size: 14pt;'>■</b> 等待模型加载完成"
+            "<div style='line-height: 1.9; font-size: 10pt; color: #2B2B2B;'>"
+            "<div style='background: #F2EDE4; padding: 5px 10px; margin: 2px 0; "
+            "border-left: 6px solid #C44B4F;'>"
+            "<b style='color: #C44B4F; font-size: 12pt;'>■</b> 等待模型加载完成"
             "</div>"
-            "<div style='background: #E8E3DA; padding: 8px 14px; margin: 3px 0; "
-            "border-left: 8px solid #2B2B2B;'>"
-            "<b style='color: #2B2B2B; font-size: 14pt;'>■</b> 点击「开始录音」按钮"
+            "<div style='background: #E8E3DA; padding: 5px 10px; margin: 2px 0; "
+            "border-left: 6px solid #2B2B2B;'>"
+            "<b style='color: #2B2B2B; font-size: 12pt;'>■</b> 点击「开始录音」按钮"
             "</div>"
-            "<div style='background: #F2EDE4; padding: 8px 14px; margin: 3px 0; "
-            "border-left: 8px solid #C44B4F;'>"
-            "<b style='color: #C44B4F; font-size: 14pt;'>■</b> 说出您的感受（3-30秒）"
+            "<div style='background: #F2EDE4; padding: 5px 10px; margin: 2px 0; "
+            "border-left: 6px solid #C44B4F;'>"
+            "<b style='color: #C44B4F; font-size: 12pt;'>■</b> 说出您的感受（3-30秒）"
             "</div>"
-            "<div style='background: #E8E3DA; padding: 8px 14px; margin: 3px 0; "
-            "border-left: 8px solid #2B2B2B;'>"
-            "<b style='color: #2B2B2B; font-size: 14pt;'>■</b> 点击「停止录音」按钮"
+            "<div style='background: #E8E3DA; padding: 5px 10px; margin: 2px 0; "
+            "border-left: 6px solid #2B2B2B;'>"
+            "<b style='color: #2B2B2B; font-size: 12pt;'>■</b> 点击「停止录音」按钮"
             "</div>"
-            "<div style='background: #F2EDE4; padding: 8px 14px; margin: 3px 0; "
-            "border-left: 8px solid #C44B4F;'>"
-            "<b style='color: #C44B4F; font-size: 14pt;'>■</b> 查看情绪分析结果"
+            "<div style='background: #F2EDE4; padding: 5px 10px; margin: 2px 0; "
+            "border-left: 6px solid #C44B4F;'>"
+            "<b style='color: #C44B4F; font-size: 12pt;'>■</b> 查看情绪分析结果"
             "</div>"
             "</div>"
         )
@@ -1422,12 +1431,12 @@ class MainWindow(QMainWindow):
 
         # 功能说明
         features_title = QLabel("▸ 功能说明")
-        features_title.setFont(QFont("Microsoft YaHei", 11, QFont.Black))
-        features_title.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 8px 14px; font-weight: 900; margin-top: 10px; border: 2px solid #2B2B2B;")
+        features_title.setFont(QFont("Microsoft YaHei", 10, QFont.Black))
+        features_title.setStyleSheet("color: #FFFFFF; background-color: #C44B4F; padding: 6px 12px; font-weight: 900; margin-top: 8px; border: 2px solid #2B2B2B;")
         guide_layout.addWidget(features_title)
 
         features_text = QLabel(
-            "<div style='line-height: 1.9; font-size: 11pt; color: #2B2B2B;'>"
+            "<div style='line-height: 1.6; font-size: 10pt; color: #2B2B2B;'>"
             "\u25aa <b>多模型支持：</b>可切换 Large/Base/Seed 三种模型<br>"
             "\u25aa <b>7种情绪识别：</b>平静、开心、惊讶、悲伤、愤怒、恐惧、厌恶<br>"
             "\u25aa <b>复合情绪检测：</b>自动识别焦虑、挫败等复合情绪<br>"
@@ -1443,7 +1452,7 @@ class MainWindow(QMainWindow):
 
         # 提示
         tip_label = QLabel(
-            "<div style='background: #F2EDE4; padding: 10px 12px; margin-top: 6px; font-size: 11pt; color: #2B2B2B; border: 2px solid #2B2B2B;'>"
+            "<div style='background: #F2EDE4; padding: 8px 10px; margin-top: 6px; font-size: 10pt; color: #2B2B2B; border: 2px solid #2B2B2B;'>"
             "<b>小贴士：</b>在安静的环境下录音，效果会更好"
             "</div>"
         )
@@ -1451,13 +1460,14 @@ class MainWindow(QMainWindow):
         tip_label.setTextFormat(Qt.RichText)
         guide_layout.addWidget(tip_label)
 
-        right_layout.addWidget(quick_guide)
+        guide_scroll.setWidget(quick_guide)
+        right_layout.addWidget(guide_scroll)
 
         content_splitter.addWidget(right_panel)
 
-        content_splitter.setStretchFactor(0, 7)
-        content_splitter.setStretchFactor(1, 3)
-        content_splitter.setSizes([840, 360])
+        content_splitter.setStretchFactor(0, 6)
+        content_splitter.setStretchFactor(1, 4)
+        content_splitter.setSizes([780, 420])
 
         layout.addWidget(content_splitter)
         self.tab_widget.addTab(realtime_widget, "▸ 实时检测")

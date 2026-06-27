@@ -143,6 +143,7 @@ class HistoryManager:
         sanitized['suggestion'] = str(record.get('suggestion', ''))[:500]
         # 新增字段（向后兼容：旧记录可能没有这些字段）
         sanitized['compound_emotion'] = str(record.get('compound_emotion', ''))[:20]
+        sanitized['compound_emotion_detail'] = record.get('compound_emotion_detail', {}) if isinstance(record.get('compound_emotion_detail'), dict) else {}
         sanitized['emotion_summary'] = str(record.get('emotion_summary', ''))[:500]
         # P0 新增字段：VAD 维度指标
         sanitized['valence_score'] = _safe_float(record.get('valence_score'), -1.0, 1.0)
@@ -213,6 +214,7 @@ class HistoryManager:
                 "confidence": conf_f,
                 "suggestion": str(result.get("suggestion_text", result.get("调节建议", "")))[:500],
                 "compound_emotion": str(result.get("复合情绪", ""))[:20],
+                "compound_emotion_detail": result.get("复合情绪详情", {}) if isinstance(result.get("复合情绪详情"), dict) else {},
                 "emotion_summary": str(result.get("情绪分析摘要", ""))[:500],
                 # P0 新增：VAD 维度指标
                 "valence_score": result.get("valence_score", 0.0),
@@ -226,6 +228,8 @@ class HistoryManager:
                 "probs_7": result.get("所有情绪概率", {}),
                 # P0 新增：稳定度分项
                 "stability_factors": result.get("稳定度分项", {}),
+                # P0 新增：音频质量（完整评估数据）
+                "audio_quality": result.get("audio_quality", {}),
                 # P0 新增：实验元数据
                 "model_name": result.get("model_name", ""),
                 "algorithm_version": result.get("algorithm_version", "2.0.0-p0"),
