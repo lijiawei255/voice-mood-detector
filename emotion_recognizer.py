@@ -43,6 +43,13 @@ import threading
 import warnings
 import re
 
+# 引入科研评估所需模块（P0/P1/P2）
+from version import APP_VERSION, ALGORITHM_VERSION
+from audio_quality import AudioQualityAnalyzer, compute_audio_quality
+from audio_features import extract_acoustic_features, compute_psychological_indicators
+from reliability import get_reliability_level
+from baseline import PersonalBaseline
+
 # 忽略一些不必要的警告信息，保持输出整洁
 warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -195,6 +202,14 @@ STABILITY_LEVELS = {
 # - 负面情绪权重：直接反映负面情绪的强度
 # - Shannon 熵：反映情绪分布的混乱程度，高熵=多情绪并存=心理冲突
 # - 极端度：检测单一负面情绪的极端高概率状态
+#
+# ⚠️ 权重来源：专家设定（基于情绪维度理论）
+# P2 数据驱动优化计划：
+#   1. 收集 ≥30 名被试的语音情绪数据 + 标准化心理量表（PANAS/SAM/PHQ-9）
+#   2. 以心理量表得分为因变量，三因子为自变量进行多元回归
+#   3. 回归系数（标准化后）可作为新的因子权重
+#   4. 使用交叉验证评估权重泛化性能
+#   5. 最终权重需经过独立样本验证后更新
 STABILITY_FACTOR_WEIGHTS = {
     "negative_weight": 0.40,   # 负面情绪加权分数权重
     "entropy": 0.30,           # 情绪分散度（Shannon 熵）权重
@@ -236,7 +251,7 @@ class EmotionRecognizer:
     情绪识别器类（单例模式）
 
     全局唯一的情绪识别实例，负责：
-    - 加载 emotion2vec_plus_large 预训练模型
+    - 加载 emotion2vec+ 系列预训练模型（seed/base/large，可动态切换）
     - 对音频文件进行情绪识别推理
     - 计算情绪稳定度分数
     - 生成调节建议
@@ -549,22 +564,32 @@ class EmotionRecognizer:
 
     def _calculate_stability_score(self, probs_dict):
         """
-        计算情绪稳定度分数（多因子综合评分）
+        计算情绪稳定度分数（多因子综合评分）及分项
 
         计算逻辑综合三个因子：
         1. 负面情绪加权分数（权重 40%）：各情绪概率×影响权重
         2. 情绪分散度/熵（权重 30%）：概率分布的 Shannon 熵，高熵=不稳定
         3. 情绪极端度（权重 30%）：负面情绪是否极端高概率
 
+        权重来源：专家设定（基于情绪维度理论），待 P2 阶段通过被试数据回归优化
+
         参数：
             probs_dict (dict): 各情绪的概率字典，键为情绪名称，值为概率（0-1）
 
         返回值：
-            float: 情绪稳定度分数（0-10，越高越不稳定），保留两位小数
+            dict: 包含各因子分数和综合分数的字典
         """
         import math
         if not isinstance(probs_dict, dict):
-            return 5.0
+            return {
+                "negative_weight_score": 5.0,
+                "entropy_score": 5.0,
+                "extremity_score": 5.0,
+                "stability_score": 5.0,
+                "stability_level": "未知",
+                "stability_color": "#95A5A6",
+                "factor_weights_source": "专家设定（负面40% + 熵30% + 极端30%），基于情绪维度理论"
+            }
 
         # --- 因子 1: 负面情绪加权分数 (0-10) ---
         negative_score = 0.0
@@ -576,7 +601,7 @@ class EmotionRecognizer:
                     negative_score += prob_f * weight * 10
             except (TypeError, ValueError):
                 continue
-        negative_score = min(10.0, max(0.0, negative_score))
+        negative_score = round(min(10.0, max(0.0, negative_score)), 2)
 
         # --- 因子 2: 情绪分散度/熵 (0-10) ---
         # Shannon 熵计算，归一化到 0-10
@@ -593,7 +618,7 @@ class EmotionRecognizer:
         # 最大熵为 log2(N)，归一化
         max_entropy = math.log2(len(probs_dict)) if len(probs_dict) > 1 else 1.0
         entropy_normalized = (entropy / max_entropy) * 10.0 if max_entropy > 0 else 0.0
-        entropy_normalized = min(10.0, max(0.0, entropy_normalized))
+        entropy_score = round(min(10.0, max(0.0, entropy_normalized)), 2)
 
         # --- 因子 3: 情绪极端度 (0-10) ---
         # 检测是否存在极端高概率的负面情绪
@@ -614,16 +639,28 @@ class EmotionRecognizer:
         # 正面情绪占主导时降低不稳定度
         if positive_total > 0.5:
             extremity_score *= (1.0 - positive_total * 0.6)
-        extremity_score = min(10.0, max(0.0, extremity_score))
+        extremity_score = round(min(10.0, max(0.0, extremity_score)), 2)
 
         # --- 综合计算 ---
         w = STABILITY_FACTOR_WEIGHTS
         final_score = (
             negative_score * w["negative_weight"] +
-            entropy_normalized * w["entropy"] +
+            entropy_score * w["entropy"] +
             extremity_score * w["extremity"]
         )
-        return round(min(10.0, max(0.0, final_score)), 2)
+        final_score = round(min(10.0, max(0.0, final_score)), 2)
+
+        stability_level, level_color = self._get_stability_level(final_score)
+
+        return {
+            "negative_weight_score": negative_score,
+            "entropy_score": entropy_score,
+            "extremity_score": extremity_score,
+            "stability_score": final_score,
+            "stability_level": stability_level,
+            "stability_color": level_color,
+            "factor_weights_source": "专家设定（负面40% + 熵30% + 极端30%），基于情绪维度理论"
+        }
 
     def _get_stability_level(self, score):
         """
@@ -720,14 +757,15 @@ class EmotionRecognizer:
 
     def _analyze_compound_emotions(self, probs_dict, main_emotion):
         """
-        分析复合情绪模式（内部方法）
+        分析复合情绪模式（内部方法）— P1 升级版：复合情绪强度评分
 
-        根据当前情绪概率分布，识别是否存在复合情绪模式。
-        复合情绪要求所有组成情绪的概率都超过一定阈值。
+        使用强度评分公式（替代旧版固定阈值）：
+            compound_score = min(components) × 0.5 + mean(components) × 0.3 + co_activation_bonus × 0.2
+        其中 co_activation_bonus = 各组成情绪概率乘积的归一化值
 
         心理学依据：
         - 复合情绪由多种基础情绪组合而成（如焦虑=恐惧+悲伤）
-        - 各组成情绪需同时达到一定强度才能判定为复合情绪
+        - co_activation_bonus 反映组成情绪同时激活的程度
         - "其他"情绪不参与复合情绪判断（非基础情绪类别）
 
         参数：
@@ -737,15 +775,15 @@ class EmotionRecognizer:
         返回值：
             dict 或 None: 复合情绪信息字典，包含：
                 - name (str): 复合情绪名称
+                - confidence (float): 复合情绪强度评分 (0-1)
+                - components (dict): 各组成情绪及其概率
                 - desc (str): 复合情绪描述
                 - advice (str): 针对性建议
+                - interpretation (str): 心理学解释
                 未检测到时返回 None
         """
         if not isinstance(probs_dict, dict):
             return None
-
-        # 复合情绪检测阈值：组成情绪概率需超过此值
-        COMPOUND_THRESHOLD = 0.10
 
         # 不参与复合情绪判断的情绪类别
         EXCLUDED_EMOTIONS = {"其他"}
@@ -755,34 +793,134 @@ class EmotionRecognizer:
 
         for compound_name, compound_info in COMPOUND_EMOTIONS.items():
             components = compound_info["components"]
-            # 检查所有组成情绪是否都超过阈值
-            all_present = True
-            component_score = 0.0
-            for comp_emotion in components:
-                # 跳过被排除的情绪类别
-                if comp_emotion in EXCLUDED_EMOTIONS:
-                    all_present = False
-                    break
-                prob = float(probs_dict.get(comp_emotion, 0.0))
-                if prob < COMPOUND_THRESHOLD:
-                    all_present = False
-                    break
-                component_score += prob
+            # 检查所有组成情绪是否都在排除列表外
+            if any(c in EXCLUDED_EMOTIONS for c in components):
+                continue
 
-            if all_present:
-                # 优先选择组成情绪总概率最高的复合情绪
-                if component_score > best_score:
-                    best_score = component_score
+            # 获取各组成情绪的概率
+            component_probs = []
+            for comp_emotion in components:
+                prob = float(probs_dict.get(comp_emotion, 0.0))
+                component_probs.append(prob)
+
+            # P1 升级：使用强度评分公式
+            if len(component_probs) > 0:
+                min_prob = min(component_probs)
+                mean_prob = sum(component_probs) / len(component_probs)
+                # co_activation_bonus: 所有组成情绪的概率乘积，反映"同时激活"程度
+                co_activation = 1.0
+                for p in component_probs:
+                    co_activation *= max(p, 0.01)  # 避免乘以0
+                co_activation_bonus = co_activation ** (1.0 / len(component_probs))  # 几何平均
+
+                compound_score = min_prob * 0.5 + mean_prob * 0.3 + co_activation_bonus * 0.2
+
+                if compound_score > best_score:
+                    best_score = compound_score
                     best_match = compound_name
 
-        if best_match:
+        # 只有当最佳得分超过最低阈值时才返回结果
+        if best_match and best_score > 0.05:
             info = COMPOUND_EMOTIONS[best_match]
+            component_details = {c: round(float(probs_dict.get(c, 0.0)), 4)
+                               for c in info["components"]}
             return {
                 "name": best_match,
+                "confidence": round(best_score, 4),
+                "components": component_details,
                 "desc": info["desc"],
-                "advice": info["advice"]
+                "advice": info["advice"],
+                "interpretation": f"由{'、'.join(info['components'])}组合而成，强度评分 {best_score:.2%}"
             }
         return None
+
+    def predict_dual_model(self, audio_path):
+        """
+        科研模式：使用 Base + Large 双模型进行交叉验证
+
+        使用当前模型作为主模型，同时使用另一个模型作为对照。
+        比较两者结果的一致性，输出模型规模敏感性评估。
+
+        参数：
+            audio_path (str): 音频文件路径
+
+        返回值：
+            dict: 包含双模型结果的综合评估字典
+        """
+        if not self.loaded:
+            return {"success": False, "error": "模型未加载"}
+
+        # 确定对照模型
+        if self.model_name == "emotion2vec_plus_large":
+            secondary_model = "emotion2vec_plus_base"
+        elif self.model_name == "emotion2vec_plus_base":
+            secondary_model = "emotion2vec_plus_large"
+        else:
+            secondary_model = "emotion2vec_plus_base"  # seed 使用 base 作为对照
+
+        # 主模型预测（标记为科研模式）
+        primary_result = self.predict(audio_path, is_research_mode=True)
+        if not primary_result.get('success'):
+            return {"success": False, "error": f"主模型预测失败: {primary_result.get('error')}"}
+
+        primary_result['model_name'] = self.model_name
+
+        # 加载对照模型并预测
+        try:
+            original_model = self.model_name
+            self.model = None
+            self.loaded = False
+            self.model_name = secondary_model
+            self.load_model()
+            # 等待加载完成（简化同步实现）
+            import time
+            waited = 0
+            while not self.loaded and waited < 60:
+                time.sleep(0.5)
+                waited += 0.5
+
+            if not self.loaded:
+                return {"success": False, "error": f"对照模型 {secondary_model} 加载失败"}
+
+            secondary_result = self.predict(audio_path)
+            secondary_result['model_name'] = secondary_model
+
+            # 恢复原模型
+            self.model = None
+            self.loaded = False
+            self.model_name = original_model
+            self.load_model()
+            # 等待原模型加载完成，避免返回后下一次 predict() 因模型未加载而失败
+            import time
+            waited_restore = 0
+            while not self.loaded and waited_restore < 60:
+                time.sleep(0.5)
+                waited_restore += 0.5
+
+            # 评估模型一致性
+            from reliability import evaluate_model_agreement
+            agreement = evaluate_model_agreement(primary_result, secondary_result)
+
+            # 以主模型结果为基础，叠加双模型验证信息，便于 GUI 直接展示
+            dual_result = dict(primary_result)
+            dual_result.update({
+                "is_dual_model": True,
+                "primary_model": original_model,
+                "secondary_model": secondary_model,
+                "model_agreement": agreement["agreement"],
+                "result_reliability": agreement["level"],
+                "model_agreement_note": agreement["note"],
+                "secondary_result": secondary_result,
+            })
+            return dual_result
+
+        except Exception as e:
+            logger.error(f"双模型预测失败: {e}")
+            # 至少返回主模型结果
+            primary_result['is_dual_model'] = True
+            primary_result['model_agreement'] = 0.0
+            primary_result['result_reliability'] = "低"
+            return primary_result
 
     def _generate_emotion_summary(self, main_emotion, confidence, mixed_emotions,
                                   compound_emotion, stability_score, stability_level):
@@ -817,7 +955,7 @@ class EmotionRecognizer:
 
         return "；".join(parts)
 
-    def predict(self, audio_path):
+    def predict(self, audio_path, is_research_mode=False):
         """
         对音频文件进行情绪识别推理
 
@@ -833,9 +971,12 @@ class EmotionRecognizer:
         6. 计算情绪稳定度分数和等级
         7. 生成调节建议
         8. 检测混合情绪
+        9. 评估音频质量、提取声学特征、计算心理状态指标
+        10. 评估综合可靠性并计算个人基线偏移（若已建立）
 
         参数：
             audio_path (str): 音频文件路径（WAV 格式，16kHz 单声道）
+            is_research_mode (bool): 是否为科研评估模式，会影响元数据标记
 
         返回值：
             dict: 识别结果字典，包含以下字段：
@@ -844,9 +985,19 @@ class EmotionRecognizer:
                 - 主要情绪 (str): 最主要的情绪类型
                 - 置信度 (float): 主要情绪的置信度（0-1）
                 - 所有情绪概率 (dict): 各情绪的概率分布
+                - 完整概率_8类 (dict): 含"其他"的完整 8 类概率
                 - 情绪稳定度分数 (float): 0-10分制稳定度评分
                 - 情绪状态等级 (str): 稳定度等级名称
                 - 等级颜色 (str): 等级对应的颜色代码
+                - 稳定度分项 (dict): 三因子分项得分
+                - valence_score (float): 效价估计值 [-1, 1]
+                - arousal_score (float): 唤醒度估计值 [0, 1]
+                - dominance_score (float): 掌控感估计值 [0, 1]
+                - audio_quality (dict): 音频质量评估结果
+                - acoustic_features (dict): 声学特征
+                - psychological_indicators (dict): 心理状态指标
+                - assessment_reliability (str): 综合可靠性等级
+                - baseline_deviation (dict): 相对个人基线的偏移
                 - 调节建议 (str): 个性化调节建议
                 - 混合情绪 (list): 混合情绪列表 [(情绪, 概率), ...]
         """
@@ -970,10 +1121,16 @@ class EmotionRecognizer:
             main_emotion = max_label[0]
             confidence = max_label[1]
 
-            # 计算情绪稳定度
-            stability_score = self._calculate_stability_score(probs_dict)
-            stability_level, level_color = self._get_stability_level(stability_score)
+            # 计算情绪稳定度（现在返回字典，含分项分数）
+            stability_result = self._calculate_stability_score(probs_dict)
+            stability_score = stability_result["stability_score"]
+            stability_level = stability_result["stability_level"]
+            level_color = stability_result["stability_color"]
             advice = self._get_advice(main_emotion, stability_score, probs_dict)
+
+            # 计算 VAD 维度指标（从离散概率推导的估计值）
+            from vad_dimensions import compute_vad_dimensions
+            vad_dimensions = compute_vad_dimensions(probs_dict)
 
             # 检测混合情绪（概率 > 8% 且不是主要情绪的视为混合情绪）
             mixed_emotions = []
@@ -990,19 +1147,118 @@ class EmotionRecognizer:
                 compound_emotion, stability_score, stability_level
             )
 
+            # =====================================================================
+            # P0/P1/P2 升级：完整评估流程集成
+            # =====================================================================
+            # 1. 音频质量评估（保证输入一致性）
+            audio_quality = None
+            try:
+                analyzer = AudioQualityAnalyzer(target_sr=16000)
+                audio_quality = analyzer.analyze(audio_path)
+            except Exception as e:
+                logger.warning(f"音频质量评估失败: {e}")
+
+            # 2. 声学特征提取（P1）
+            acoustic_features = None
+            try:
+                acoustic_features = extract_acoustic_features(audio_path, sr=16000)
+            except Exception as e:
+                logger.warning(f"声学特征提取失败: {e}")
+
+            # 3. 心理状态指标（P1）
+            psychological_indicators = {}
+            try:
+                vad_dims = {
+                    "valence_score": vad_dimensions["valence_score"],
+                    "arousal_score": vad_dimensions["arousal_score"],
+                    "dominance_score": vad_dimensions["dominance_score"],
+                    "negative_load": vad_dimensions["negative_load"],
+                    "emotional_uncertainty": vad_dimensions["emotional_uncertainty"],
+                }
+                psychological_indicators = compute_psychological_indicators(
+                    acoustic_features, vad_dims
+                )
+            except Exception as e:
+                logger.warning(f"心理状态指标计算失败: {e}")
+
+            # 4. 综合可靠性评分（P0/P1）
+            assessment_reliability = "中"
+            try:
+                reliability_assessment = {
+                    "audio_quality": audio_quality,
+                    "confidence": confidence,
+                    "consistency": None,  # 单次检测无多次采样一致性
+                }
+                assessment_reliability = get_reliability_level(reliability_assessment)
+            except Exception as e:
+                logger.warning(f"可靠性评估失败: {e}")
+
+            # 5. 个人基线偏移（P2）
+            baseline_deviation = {"available": False, "note": "基线尚未建立"}
+            try:
+                baseline_mgr = PersonalBaseline()
+                if baseline_mgr.is_established():
+                    baseline_deviation = baseline_mgr.compute_deviation({
+                        "主要情绪": main_emotion,
+                        "置信度": confidence,
+                        "情绪稳定度分数": stability_score,
+                        "valence_score": vad_dimensions["valence_score"],
+                        "arousal_score": vad_dimensions["arousal_score"],
+                        "dominance_score": vad_dimensions["dominance_score"],
+                        "negative_load": vad_dimensions["negative_load"],
+                        "emotional_uncertainty": vad_dimensions["emotional_uncertainty"],
+                        "acoustic_features": acoustic_features or {},
+                    })
+            except Exception as e:
+                logger.warning(f"基线偏移计算失败: {e}")
+
             return {
                 "success": True,
                 "主要情绪": main_emotion,
                 "置信度": round(confidence, 4),
+                # 完整8类概率（含"其他"，用于科研记录）
+                "完整概率_8类": {k: round(v, 4) for k, v in probs_dict.items()},
+                # 显示用7类概率（排除"其他"，用于前端展示）
                 "所有情绪概率": display_probs,
+                # 原始模型输出（用于科研复算）
+                "原始模型输出": {
+                    "labels": [str(l) for l in raw_labels],
+                    "scores": [round(float(s), 6) for s in raw_scores] if raw_scores else []
+                },
+                # 稳定度及分项（含权重来源标注）
                 "情绪稳定度分数": stability_score,
                 "情绪状态等级": stability_level,
                 "等级颜色": level_color,
+                "稳定度分项": {
+                    "negative_weight_score": stability_result["negative_weight_score"],
+                    "entropy_score": stability_result["entropy_score"],
+                    "extremity_score": stability_result["extremity_score"],
+                    "factor_weights_source": stability_result["factor_weights_source"]
+                },
+                # VAD 维度指标（⚠️ 从离散概率推导的估计值）
+                "valence_score": vad_dimensions["valence_score"],
+                "arousal_score": vad_dimensions["arousal_score"],
+                "dominance_score": vad_dimensions["dominance_score"],
+                "negative_load": vad_dimensions["negative_load"],
+                "emotional_uncertainty": vad_dimensions["emotional_uncertainty"],
+                "estimation_note": vad_dimensions["estimation_note"],
+                # 原有字段
                 "调节建议": advice,
                 "混合情绪": mixed_emotions,
                 "复合情绪": compound_emotion.get("name", "") if compound_emotion else "",
                 "复合情绪详情": compound_emotion if compound_emotion else None,
-                "情绪分析摘要": emotion_summary
+                "情绪分析摘要": emotion_summary,
+                # P0/P1/P2 新增：音频质量、声学特征、心理状态指标、可靠性、基线
+                "audio_quality": audio_quality if audio_quality else {},
+                "acoustic_features": acoustic_features if acoustic_features else {},
+                "psychological_indicators": psychological_indicators,
+                "assessment_reliability": assessment_reliability,
+                "baseline_deviation": baseline_deviation,
+                # 科研元数据（可复现性）
+                "model_name": self.model_name,
+                "algorithm_version": ALGORITHM_VERSION,
+                "app_version": APP_VERSION,
+                "is_research_mode": bool(is_research_mode),
             }
 
         except torch.cuda.OutOfMemoryError:

@@ -20,7 +20,7 @@
 - 缓冲区大小：1024 帧
 
 作者：Jiawei Li
-许可证：MIT License
+许可证：GPL v3
 """
 
 import pyaudio

@@ -38,6 +38,15 @@ from app_paths import get_history_path, get_recordings_dir, safe_remove_file, is
 logger = logging.getLogger(__name__)
 
 
+def _safe_float(value, min_val, max_val):
+    """安全转换浮点数到指定范围"""
+    try:
+        v = float(value)
+        return round(max(min_val, min(max_val, v)), 6)
+    except (TypeError, ValueError):
+        return min_val
+
+
 class HistoryManager:
     """
     历史记录管理器类
@@ -134,7 +143,30 @@ class HistoryManager:
         sanitized['suggestion'] = str(record.get('suggestion', ''))[:500]
         # 新增字段（向后兼容：旧记录可能没有这些字段）
         sanitized['compound_emotion'] = str(record.get('compound_emotion', ''))[:20]
+        sanitized['compound_emotion_detail'] = record.get('compound_emotion_detail', {}) if isinstance(record.get('compound_emotion_detail'), dict) else {}
         sanitized['emotion_summary'] = str(record.get('emotion_summary', ''))[:500]
+        # P0 新增字段：VAD 维度指标
+        sanitized['valence_score'] = _safe_float(record.get('valence_score'), -1.0, 1.0)
+        sanitized['arousal_score'] = _safe_float(record.get('arousal_score'), 0.0, 1.0)
+        sanitized['dominance_score'] = _safe_float(record.get('dominance_score'), 0.0, 1.0)
+        sanitized['negative_load'] = _safe_float(record.get('negative_load'), 0.0, 1.0)
+        sanitized['emotional_uncertainty'] = _safe_float(record.get('emotional_uncertainty'), 0.0, 1.0)
+        # P0 新增字段：原始输出与完整概率（用于科研复算）
+        sanitized['raw_model_output'] = record.get('raw_model_output', {}) if isinstance(record.get('raw_model_output'), dict) else {}
+        sanitized['probs_8'] = record.get('probs_8', {}) if isinstance(record.get('probs_8'), dict) else {}
+        sanitized['probs_7'] = record.get('probs_7', {}) if isinstance(record.get('probs_7'), dict) else {}
+        # P0 新增字段：稳定度分项因子
+        sanitized['stability_factors'] = record.get('stability_factors', {}) if isinstance(record.get('stability_factors'), dict) else {}
+        # P0 新增字段：音频质量
+        sanitized['audio_quality'] = record.get('audio_quality', {}) if isinstance(record.get('audio_quality'), dict) else {}
+        # P0 新增字段：实验元数据（可复现性基础）
+        sanitized['model_name'] = str(record.get('model_name', ''))[:50]
+        sanitized['algorithm_version'] = str(record.get('algorithm_version', ''))[:20]
+        sanitized['app_version'] = str(record.get('app_version', ''))[:20]
+        sanitized['is_research_mode'] = bool(record.get('is_research_mode', False))
+        sanitized['assessment_reliability'] = str(record.get('assessment_reliability', ''))[:20]
+        # P0 新增字段：估计标注说明
+        sanitized['estimation_note'] = str(record.get('estimation_note', ''))[:500]
         return sanitized
 
     def add_record(self, result):
@@ -171,7 +203,7 @@ class HistoryManager:
             except (TypeError, ValueError):
                 conf_f = 0.0
 
-            # 构建记录对象
+            # 构建记录对象（含P0新增科研元数据字段）
             record = {
                 "id": datetime.now().strftime("%Y%m%d_%H%M%S_") + uuid.uuid4().hex[:6],
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -182,7 +214,29 @@ class HistoryManager:
                 "confidence": conf_f,
                 "suggestion": str(result.get("suggestion_text", result.get("调节建议", "")))[:500],
                 "compound_emotion": str(result.get("复合情绪", ""))[:20],
-                "emotion_summary": str(result.get("情绪分析摘要", ""))[:500]
+                "compound_emotion_detail": result.get("复合情绪详情", {}) if isinstance(result.get("复合情绪详情"), dict) else {},
+                "emotion_summary": str(result.get("情绪分析摘要", ""))[:500],
+                # P0 新增：VAD 维度指标
+                "valence_score": result.get("valence_score", 0.0),
+                "arousal_score": result.get("arousal_score", 0.0),
+                "dominance_score": result.get("dominance_score", 0.0),
+                "negative_load": result.get("negative_load", 0.0),
+                "emotional_uncertainty": result.get("emotional_uncertainty", 0.0),
+                # P0 新增：原始输出与完整概率
+                "raw_model_output": result.get("原始模型输出", {}),
+                "probs_8": result.get("完整概率_8类", {}),
+                "probs_7": result.get("所有情绪概率", {}),
+                # P0 新增：稳定度分项
+                "stability_factors": result.get("稳定度分项", {}),
+                # P0 新增：音频质量（完整评估数据）
+                "audio_quality": result.get("audio_quality", {}),
+                # P0 新增：实验元数据
+                "model_name": result.get("model_name", ""),
+                "algorithm_version": result.get("algorithm_version", "2.0.0-p2"),
+                "app_version": result.get("app_version", "2.0.0"),
+                "is_research_mode": bool(result.get("is_research_mode", False)),
+                "assessment_reliability": str(result.get("assessment_reliability", ""))[:20],
+                "estimation_note": str(result.get("estimation_note", ""))[:500],
             }
             # 数据清洗
             record = self._sanitize_record(record)
@@ -192,26 +246,29 @@ class HistoryManager:
 
             self.records.append(record)
 
-            # 达到自动清理阈值时，通知并删除最早的记录
-            if len(self.records) >= self.AUTO_CLEAN_THRESHOLD:
-                if self.cleanup_callback:
-                    try:
-                        self.cleanup_callback(self.AUTO_CLEAN_COUNT)
-                    except Exception:
-                        pass
-                # 删除最早的 AUTO_CLEAN_COUNT 条记录
-                to_delete = self.records[:self.AUTO_CLEAN_COUNT]
-                for old_rec in to_delete:
-                    self._delete_audio_file(old_rec.get("audio_file", ""))
-                self.records = self.records[self.AUTO_CLEAN_COUNT:]
-                logger.info(f"自动清理: 删除最早的 {self.AUTO_CLEAN_COUNT} 条历史记录")
+            # 科研模式下禁用自动清理（保证长期追踪数据完整性）
+            is_research = bool(result.get("is_research_mode", False))
+            if not is_research:
+                # 达到自动清理阈值时，通知并删除最早的记录
+                if len(self.records) >= self.AUTO_CLEAN_THRESHOLD:
+                    if self.cleanup_callback:
+                        try:
+                            self.cleanup_callback(self.AUTO_CLEAN_COUNT)
+                        except Exception:
+                            pass
+                    # 删除最早的 AUTO_CLEAN_COUNT 条记录
+                    to_delete = self.records[:self.AUTO_CLEAN_COUNT]
+                    for old_rec in to_delete:
+                        self._delete_audio_file(old_rec.get("audio_file", ""))
+                    self.records = self.records[self.AUTO_CLEAN_COUNT:]
+                    logger.info(f"自动清理: 删除最早的 {self.AUTO_CLEAN_COUNT} 条历史记录")
 
-            # 超过最大记录数时，清理最旧的记录
-            if len(self.records) > self.MAX_RECORDS:
-                oldest = self.records[:-self.MAX_RECORDS]
-                for old_rec in oldest:
-                    self._delete_audio_file(old_rec.get("audio_file", ""))
-                self.records = self.records[-self.MAX_RECORDS:]
+                # 超过最大记录数时，清理最旧的记录
+                if len(self.records) > self.MAX_RECORDS:
+                    oldest = self.records[:-self.MAX_RECORDS]
+                    for old_rec in oldest:
+                        self._delete_audio_file(old_rec.get("audio_file", ""))
+                    self.records = self.records[-self.MAX_RECORDS:]
 
             self.save()
             return True
@@ -444,3 +501,174 @@ class HistoryManager:
             int: 记录数量
         """
         return len(self.records)
+
+    # =========================================================================
+    # P1 新增：统计分析 API
+    # =========================================================================
+
+    def get_statistics(self):
+        """
+        获取历史记录的汇总统计
+
+        返回值：
+            dict: 包含各指标均值、标准差、极值的统计字典
+        """
+        if not self.records:
+            return {"record_count": 0}
+
+        records = self.records
+        n = len(records)
+
+        # 收集各指标
+        stability_scores = []
+        confidences = []
+        valence_scores = []
+        arousal_scores = []
+        dominance_scores = []
+        emotion_counts = {}
+        compound_counts = {}
+
+        for r in records:
+            try:
+                stability_scores.append(float(r.get('anxiety_score', 0)))
+                confidences.append(float(r.get('confidence', 0)))
+                valence_scores.append(float(r.get('valence_score', 0)))
+                arousal_scores.append(float(r.get('arousal_score', 0)))
+                dominance_scores.append(float(r.get('dominance_score', 0)))
+            except (TypeError, ValueError):
+                continue
+
+            emotion = r.get('main_emotion', '未知')
+            emotion_counts[emotion] = emotion_counts.get(emotion, 0) + 1
+
+            compound = r.get('compound_emotion', '')
+            if compound:
+                compound_counts[compound] = compound_counts.get(compound, 0) + 1
+
+        import numpy as np
+
+        # 样本标准差（ddof=1）：样本量 < 2 时退化为 0，避免 nan
+        def _sample_std(values):
+            if len(values) < 2:
+                return 0
+            return round(float(np.std(values, ddof=1)), 2)
+
+        return {
+            "record_count": n,
+            "stability": {
+                "mean": round(float(np.mean(stability_scores)), 2) if stability_scores else 0,
+                "std": _sample_std(stability_scores) if stability_scores else 0,
+                "min": round(float(np.min(stability_scores)), 2) if stability_scores else 0,
+                "max": round(float(np.max(stability_scores)), 2) if stability_scores else 0,
+            },
+            "confidence": {
+                "mean": round(float(np.mean(confidences)), 4) if confidences else 0,
+            },
+            "valence": {
+                "mean": round(float(np.mean(valence_scores)), 4) if valence_scores else 0,
+            },
+            "arousal": {
+                "mean": round(float(np.mean(arousal_scores)), 4) if arousal_scores else 0,
+            },
+            "dominance": {
+                "mean": round(float(np.mean(dominance_scores)), 4) if dominance_scores else 0,
+            },
+            "emotion_distribution": emotion_counts,
+            "compound_distribution": compound_counts,
+        }
+
+    def get_emotion_distribution(self):
+        """
+        获取情绪分布统计
+
+        返回值：
+            dict: 情绪名称 -> 出现次数
+        """
+        dist = {}
+        for r in self.records:
+            emo = r.get('main_emotion', '未知')
+            dist[emo] = dist.get(emo, 0) + 1
+        return dist
+
+    def get_stability_summary(self):
+        """
+        获取稳定度摘要（均值、标准差、趋势）
+
+        返回值：
+            dict: 稳定度统计摘要
+        """
+        if not self.records:
+            return {"mean": 0, "std": 0, "trend": "无数据"}
+
+        scores = []
+        for r in self.records:
+            try:
+                scores.append(float(r.get('anxiety_score', 0)))
+            except (TypeError, ValueError):
+                continue
+
+        if not scores:
+            return {"mean": 0, "std": 0, "trend": "无数据"}
+
+        import numpy as np
+        mean_val = float(np.mean(scores))
+        # 样本标准差（ddof=1）：样本量 < 2 时退化为 0，避免 nan
+        std_val = float(np.std(scores, ddof=1)) if len(scores) >= 2 else 0.0
+
+        # 简单趋势判断（最近5条 vs 总体均值）
+        # self.records 为升序（最旧在前），故取末尾 5 条作为「最近」
+        recent = scores[-min(5, len(scores)):]
+        recent_mean = float(np.mean(recent)) if recent else mean_val
+        if recent_mean > mean_val + 1.0:
+            trend = "上升（情绪稳定性下降）"
+        elif recent_mean < mean_val - 1.0:
+            trend = "下降（情绪稳定性改善）"
+        else:
+            trend = "稳定"
+
+        return {
+            "mean": round(mean_val, 2),
+            "std": round(std_val, 2),
+            "recent_mean": round(recent_mean, 2),
+            "trend": trend,
+        }
+
+    def get_compound_emotion_stats(self):
+        """
+        获取复合情绪频次统计
+
+        返回值：
+            dict: 复合情绪名称 -> 出现次数
+        """
+        stats = {}
+        for r in self.records:
+            compound = r.get('compound_emotion', '')
+            if compound:
+                stats[compound] = stats.get(compound, 0) + 1
+        return stats
+
+    def export_records_csv(self, output_path):
+        """
+        导出历史记录为 CSV 文件（委托到 export_manager）
+
+        参数：
+            output_path (str): 输出文件路径
+
+        返回值：
+            bool: True 表示导出成功
+        """
+        from export_manager import export_records_csv as _export_csv
+        return _export_csv(self.get_records(), output_path)
+
+    def export_research_dataset(self, output_path):
+        """
+        导出完整研究数据集（委托到 export_manager）
+
+        参数：
+            output_path (str): 输出文件路径
+
+        返回值：
+            bool: True 表示导出成功
+        """
+        from export_manager import export_research_dataset as _export_json
+        return _export_json(self.get_records(), output_path)

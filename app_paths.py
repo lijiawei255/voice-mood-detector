@@ -17,7 +17,7 @@
 6. 存储空间统计
 
 作者：Jiawei Li
-许可证：MIT License
+许可证：GPL v3
 """
 
 import os
