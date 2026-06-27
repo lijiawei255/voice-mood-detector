@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-趋势图表模块 — 构成主义风格
+趋势图表模块 — 极简主义风格
 
 封装 matplotlib 的 FigureCanvas，用于在 PyQt5 界面中显示情绪稳定度趋势图。
-支持分区域着色、中文字体、数据点标签和图例。
+极简主义风格：白色背景、蓝色线条、细网格、柔和色带。
 
 作者：Jiawei Li
 许可证：GPL v3
@@ -22,6 +22,17 @@ except ImportError:
     MATPLOTLIB_AVAILABLE = False
 
 
+# 极简主义色板
+_BG = "#FFFFFF"
+_TEXT_PRIMARY = "#1D1D1F"
+_TEXT_SECONDARY = "#86868B"
+_ACCENT = "#1A73E8"
+_SUCCESS = "#34A853"
+_WARNING = "#F9AB00"
+_ERROR = "#EA4335"
+_BORDER = "#D2D2D7"
+
+
 class MplCanvas(FigureCanvas):
     """
     matplotlib 图表画布类
@@ -31,9 +42,7 @@ class MplCanvas(FigureCanvas):
     - 绘制情绪稳定度变化趋势图
     - 自动配置中文字体（微软雅黑/黑体）
     - 支持分区域着色（不同稳定度等级不同颜色）
-    - 使用日期时间作为 x 轴标签
-    - 数据点标签仅在数据点 <= 20 个时显示
-    - 图例位于图表下方，不占用绘图区域
+    - 极简主义风格
 
     参数：
         parent: 父窗口部件
@@ -61,23 +70,18 @@ class MplCanvas(FigureCanvas):
             logger.warning(f"设置中文字体失败: {str(e)}")
 
     def _draw_background_zones(self):
-        """绘制稳定度背景色带 — 构成主义几何分块（更明显的对比）"""
-        self.axes.axhspan(0, 2, alpha=0.08, color='#2B2B2B', zorder=0)
-        self.axes.axhspan(2, 4, alpha=0.05, color='#2B2B2B', zorder=0)
-        self.axes.axhspan(4, 6, alpha=0.08, color='#8A8580', zorder=0)
-        self.axes.axhspan(6, 8, alpha=0.10, color='#C44B4F', zorder=0)
-        self.axes.axhspan(8, 10, alpha=0.15, color='#C44B4F', zorder=0)
-        # 构成主义对角线：在图表底部绘制红色斜向强调线
-        self.axes.axline((0.1, 0.18), (0.9, 0.03), color='#C44B4F', linewidth=1.5,
-                        alpha=0.6, transform=self.axes.transAxes, zorder=0)
+        """绘制稳定度背景色带 — 极简柔和色带（绿/黄/红三区）"""
+        self.axes.axhspan(0, 4, alpha=0.06, color=_SUCCESS, zorder=0)
+        self.axes.axhspan(4, 6, alpha=0.06, color=_WARNING, zorder=0)
+        self.axes.axhspan(6, 10, alpha=0.06, color=_ERROR, zorder=0)
 
     def _draw_legend(self):
-        """绘制图例 - 构成主义简洁风格"""
+        """绘制图例 - 极简风格"""
         from matplotlib.patches import Patch
         legend_elements = [
-            Patch(facecolor='#2B2B2B', alpha=0.3, label='稳定 (0-4)'),
-            Patch(facecolor='#8A8580', alpha=0.4, label='波动 (4-6)'),
-            Patch(facecolor='#C44B4F', alpha=0.5, label='不稳定 (6-10)'),
+            Patch(facecolor=_SUCCESS, alpha=0.3, label='稳定 (0-4)'),
+            Patch(facecolor=_WARNING, alpha=0.3, label='波动 (4-6)'),
+            Patch(facecolor=_ERROR, alpha=0.3, label='不稳定 (6-10)'),
         ]
         self.fig.legend(
             handles=legend_elements,
@@ -85,11 +89,8 @@ class MplCanvas(FigureCanvas):
             bbox_to_anchor=(0.98, 0.98),
             ncol=3,
             fontsize=8,
-            frameon=True,
-            framealpha=0.9,
-            edgecolor='#2B2B2B',
-            borderpad=0.4,
-            columnspacing=1.0,
+            frameon=False,
+            columnspacing=1.2,
             handlelength=1.2,
             handletextpad=0.4
         )
@@ -105,12 +106,12 @@ class MplCanvas(FigureCanvas):
                 leg.remove()
 
             if not records:
-                self.fig.set_facecolor('#F2EDE4')
-                self.axes.set_facecolor('#F2EDE4')
-                self.axes.set_title("■ 情绪稳定度变化趋势", fontsize=13, fontweight='bold', pad=12, loc='left')
-                self.axes.set_ylabel("情绪稳定度 (0-10)", fontsize=10, fontweight='bold', labelpad=10)
+                self.fig.set_facecolor(_BG)
+                self.axes.set_facecolor(_BG)
+                self.axes.set_title("情绪稳定度变化趋势", fontsize=13, color=_TEXT_PRIMARY, pad=12, loc='left')
+                self.axes.set_ylabel("情绪稳定度 (0-10)", fontsize=10, color=_TEXT_SECONDARY, labelpad=10)
                 self.axes.set_ylim(0, 10)
-                self.axes.grid(True, alpha=0.4, linestyle='-', linewidth=1, zorder=1)
+                self._apply_axes_style()
                 self._draw_background_zones()
                 self._draw_legend()
                 self.fig.tight_layout(pad=2.0)
@@ -131,37 +132,31 @@ class MplCanvas(FigureCanvas):
                     y.append(0.0)
                 timestamps.append(str(r.get('timestamp', '')))
 
-            self.fig.set_facecolor('#F2EDE4')
-            self.axes.set_facecolor('#F2EDE4')
-
-            # 构成主义：图表顶部红色强调带（通过横跨色块）
-            self.axes.axhspan(9.5, 10.3, alpha=0.25, color='#C44B4F', zorder=2)
+            self.fig.set_facecolor(_BG)
+            self.axes.set_facecolor(_BG)
 
             # 背景色带
             self._draw_background_zones()
 
-            # 绘制趋势线 - 构成主义工业风格：砖红线条+方块数据点
-            self.axes.plot(x, y, color='#C44B4F', linewidth=2.5, marker='s',
-                           markersize=6, markerfacecolor='#C44B4F',
-                           markeredgecolor='#2B2B2B', markeredgewidth=1.5,
-                           zorder=5, solid_capstyle='round')
+            # 绘制趋势线 - 极简蓝色线条 + 圆形数据点
+            self.axes.plot(x, y, color=_ACCENT, linewidth=2.0, marker='o',
+                           markersize=5, markerfacecolor=_ACCENT,
+                           markeredgecolor=_BG, markeredgewidth=1.2,
+                           zorder=5)
 
             # 数据点标签（仅 <= 20 个时显示）
             if n <= 20:
                 for xi, yi in zip(x, y):
                     self.axes.annotate(f'{yi:.1f}', (xi, yi), textcoords="offset points",
-                                      xytext=(0, 10), ha='center', fontsize=8,
-                                      fontweight='bold', color='#2B2B2B', zorder=6)
+                                      xytext=(0, 8), ha='center', fontsize=8,
+                                      color=_TEXT_SECONDARY, zorder=6)
 
-            # x 轴标签：使用日期时间
-            # 构成主义标题：红底白字风格（通过背景色块模拟）
-            self.axes.set_title("■ 情绪稳定度变化趋势", fontsize=14, fontweight='bold', pad=15, loc='left',
-                               color='#2B2B2B')
-            self.axes.set_ylabel("稳定度 (0–10)", fontsize=10, fontweight='bold', labelpad=10,
-                               color='#2B2B2B')
+            # 标题
+            self.axes.set_title("情绪稳定度变化趋势", fontsize=14, color=_TEXT_PRIMARY, pad=15, loc='left')
+            self.axes.set_ylabel("稳定度 (0–10)", fontsize=10, color=_TEXT_SECONDARY, labelpad=10)
             self.axes.set_ylim(-0.3, 10.3)
             self.axes.set_xlim(0.5, n + 0.5)
-            self.axes.grid(True, alpha=0.4, linestyle='-', linewidth=1, zorder=1)
+            self._apply_axes_style()
 
             # 设置 x 轴刻度
             if n <= 15:
@@ -209,3 +204,18 @@ class MplCanvas(FigureCanvas):
             self.draw()
         except Exception as e:
             logger.error(f"绘图失败: {str(e)}", exc_info=True)
+
+    def _apply_axes_style(self):
+        """应用极简主义坐标轴样式"""
+        # 隐藏顶/右边框
+        self.axes.spines['top'].set_visible(False)
+        self.axes.spines['right'].set_visible(False)
+        # 左/下边框改为细灰色
+        self.axes.spines['left'].set_color(_BORDER)
+        self.axes.spines['left'].set_linewidth(1)
+        self.axes.spines['bottom'].set_color(_BORDER)
+        self.axes.spines['bottom'].set_linewidth(1)
+        # 刻度颜色
+        self.axes.tick_params(colors=_TEXT_SECONDARY, length=3)
+        # 细网格
+        self.axes.grid(True, alpha=0.4, linestyle='-', linewidth=0.6, color=_BORDER, zorder=1)

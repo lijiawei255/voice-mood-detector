@@ -112,7 +112,9 @@ MainWindow (1500×1000 default)
 
 ### Design Style
 
-Soviet Constructivist (苏联构成主义): thick charcoal borders (#2B2B2B), brick-red accents (#C44B4F), warm off-white background (#F2EDE4/#E8E3DA), 45° diagonal textures, triangular wedge decorations, no rounded corners, bold typography.
+极简主义（瑞士/包豪斯现代极简）：纯白背景 (#FFFFFF)，浅灰次背景 (#F5F5F7)，文字主色 #1D1D1F / 次色 #86868B，蓝色强调 #1A73E8，细线边框 (#D2D2D7)，适度圆角 (4-8px)，状态色（成功 #34A853 / 警告 #F9AB00 / 错误 #EA4335）。无装饰图案、无三角形/楔形、无斜线纹理，功能优先。
+
+历史背景：本应用早期采用「苏联构成主义」风格（粗炭黑边框、砖红强调、三角装饰），于 2026-06-27 重构为极简主义风格。
 
 ### Data Flow
 

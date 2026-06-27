@@ -3,8 +3,10 @@
 Toast 通知组件模块
 
 提供非阻塞式弹窗通知：
-- ToastNotification: 单个通知弹窗（构成主义风格）
+- ToastNotification: 单个通知弹窗（极简主义风格）
 - ToastManager: 通知管理器（防止重叠）
+
+极简主义风格：圆角卡片 + 左侧色条（错误红/警告黄/信息蓝）
 
 作者：Jiawei Li
 许可证：GPL v3
@@ -14,14 +16,24 @@ from PyQt5.QtWidgets import (
     QFrame, QHBoxLayout, QVBoxLayout, QLabel, QPushButton
 )
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont, QColor, QPainter, QBrush, QPainterPath
+from PyQt5.QtGui import QFont, QPainter, QBrush, QPainterPath, QColor
+
+
+# 极简主义色板
+_TEXT_PRIMARY = "#1D1D1F"
+_TEXT_SECONDARY = "#86868B"
+_ACCENT = "#1A73E8"
+_WARNING = "#F9AB00"
+_ERROR = "#EA4335"
+_BORDER = "#D2D2D7"
 
 
 class ToastNotification(QFrame):
     """
-    苹果风格弹窗通知组件
+    极简主义风格弹窗通知组件
 
     用于在界面右上角展示错误/警告信息，支持自动消失和手动关闭。
+    圆角卡片 + 左侧色条编码级别。
     """
 
     def __init__(self, parent, message, level="warning", duration=5000):
@@ -30,80 +42,81 @@ class ToastNotification(QFrame):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setFixedWidth(380)
         self._opacity = 1.0
+        self._level = level
 
-        # 图标和颜色 - 构成主义风格
+        # 级别色彩编码 — 极简主义
         if level == "error":
-            icon = "■"  # 几何方块
-            bg_color = "#F2EDE4"
-            border_color = "#C44B4F"
-            title_color = "#C44B4F"
             title_text = "错误"
+            stripe_color = _ERROR
         else:
-            icon = "▲"  # 几何三角
-            bg_color = "#F2EDE4"
-            border_color = "#8A8580"
-            title_color = "#2B2B2B"
             title_text = "警告"
+            stripe_color = _WARNING
 
-        # 布局
+        # 布局：左侧色条 + 内容
         main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(16, 12, 12, 12)
-        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
-        # 图标
-        icon_label = QLabel(icon)
-        icon_label.setFont(QFont("Segoe UI Emoji", 16))
-        icon_label.setFixedSize(32, 32)
-        icon_label.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(icon_label)
+        # 左侧色条（4px 宽，圆角）
+        self._stripe_color = QColor(stripe_color)
+        stripe = QFrame()
+        stripe.setFixedWidth(4)
+        stripe.setStyleSheet(f"background-color: {stripe_color}; border-top-left-radius: 8px; border-bottom-left-radius: 8px;")
+        main_layout.addWidget(stripe)
 
         # 内容区
-        content_layout = QVBoxLayout()
-        content_layout.setSpacing(2)
+        content_wrap = QFrame()
+        content_wrap.setStyleSheet(f"background-color: #FFFFFF; border-top-right-radius: 8px; border-bottom-right-radius: 8px;")
+        content_layout = QHBoxLayout(content_wrap)
+        content_layout.setContentsMargins(16, 12, 12, 12)
+        content_layout.setSpacing(10)
+
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(2)
 
         title_label = QLabel(title_text)
         title_label.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
-        title_label.setStyleSheet(f"color: {title_color}; background: transparent;")
-        content_layout.addWidget(title_label)
+        title_label.setStyleSheet(f"color: {_TEXT_PRIMARY}; background: transparent;")
+        text_layout.addWidget(title_label)
 
         msg_label = QLabel(message)
         msg_label.setFont(QFont("Microsoft YaHei", 9))
         msg_label.setWordWrap(True)
-        msg_label.setStyleSheet("color: #2B2B2B; background: transparent;")
-        msg_label.setMaximumWidth(280)
-        content_layout.addWidget(msg_label)
+        msg_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; background: transparent;")
+        msg_label.setMaximumWidth(300)
+        text_layout.addWidget(msg_label)
 
-        main_layout.addLayout(content_layout, 1)
+        content_layout.addLayout(text_layout, 1)
 
         # 关闭按钮
         close_btn = QPushButton("×")
         close_btn.setFixedSize(24, 24)
         close_btn.setFont(QFont("Arial", 14))
         close_btn.setCursor(Qt.PointingHandCursor)
-        close_btn.setStyleSheet("""
-            QPushButton {
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
                 background: transparent;
                 border: none;
-                color: #2B2B2B;
-                border-radius: 0px;
-            }
-            QPushButton:hover {
-                background: rgba(43,43,43,0.1);
-                color: #C44B4F;
-            }
+                color: {_TEXT_SECONDARY};
+                border-radius: 4px;
+            }}
+            QPushButton:hover {{
+                background-color: #E8EAED;
+                color: {_TEXT_PRIMARY};
+            }}
         """)
         close_btn.clicked.connect(self.fade_out)
-        main_layout.addWidget(close_btn, 0, Qt.AlignTop)
+        content_layout.addWidget(close_btn, 0, Qt.AlignTop)
+
+        main_layout.addWidget(content_wrap, 1)
 
         self.setStyleSheet(f"""
             ToastNotification {{
-                background-color: {bg_color};
-                border: 3px solid {border_color};
-                border-radius: 0px;
+                background-color: #FFFFFF;
+                border: 1px solid {_BORDER};
+                border-radius: 8px;
             }}
         """)
-
-        # 构成主义风格：无阴影，纯平面，用粗边框强化层次
 
         self.adjustSize()
 
@@ -116,7 +129,6 @@ class ToastNotification(QFrame):
     def fade_out(self):
         """ 淡出动画后关闭 """
         self._timer.stop()
-        # 用一个简单的定时器动画模拟淡出
         self._fade_timer = QTimer(self)
         self._fade_step = 0
         self._fade_timer.timeout.connect(self._do_fade)
@@ -131,15 +143,6 @@ class ToastNotification(QFrame):
             self._fade_timer.stop()
             self.close()
             self.deleteLater()
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setOpacity(self._opacity)
-        path = QPainterPath()
-        path.addRect(0, 0, self.width(), self.height())
-        painter.fillPath(path, QBrush(self.palette().window().color()))
-        super().paintEvent(event)
 
 
 class ToastManager:
