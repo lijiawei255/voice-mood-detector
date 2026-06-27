@@ -57,6 +57,7 @@ class ResearchSession:
         self.recorder = recorder
         self.recognizer = recognizer
         self.cancelled = False
+        self._stop_sample = False
         self._lock = threading.Lock()
 
     def cancel(self):
@@ -72,6 +73,28 @@ class ResearchSession:
     def _is_cancelled(self):
         with self._lock:
             return self.cancelled
+
+    def request_stop_current_sample(self):
+        """
+        请求停止当前段录音（不取消整个会话）
+
+        与 cancel() 的区别：仅结束当前正在录制的样本，会话继续进入
+        质量门控与下一段采样。用于让用户手动结束某段录音。
+
+        线程安全：由主线程调用，record_sample 在后台线程轮询该标志。
+        """
+        with self._lock:
+            self._stop_sample = True
+        # 立即停止录音，让 record_sample 的等待循环尽快退出
+        try:
+            if self.recorder.is_recording():
+                self.recorder.stop_recording()
+        except Exception as e:
+            logger.warning(f"手动停止当前段录音失败: {e}")
+
+    def _is_stop_sample_requested(self):
+        with self._lock:
+            return self._stop_sample
 
     def quality_gate(self, audio_path, is_research=True):
         """
@@ -128,7 +151,10 @@ class ResearchSession:
             return False
 
         elapsed = 0.0
-        while elapsed < max_duration and self.recorder.is_recording() and not self._is_cancelled():
+        while (elapsed < max_duration
+               and self.recorder.is_recording()
+               and not self._is_cancelled()
+               and not self._is_stop_sample_requested()):
             time.sleep(0.2)
             elapsed += 0.2
             if progress_callback and int(elapsed * 5) % 5 == 0:
@@ -139,6 +165,13 @@ class ResearchSession:
 
         if self.recorder.is_recording():
             self.recorder.stop_recording()
+
+        # 用户请求仅停止当前段（非取消整个会话）：重置标志，视为本段成功录制，
+        # 让会话继续进入质量门控（过短则由 quality_gate 优雅反馈）
+        if self._is_stop_sample_requested():
+            with self._lock:
+                self._stop_sample = False
+            return os.path.exists(output_path) and not self._is_cancelled()
 
         return not self._is_cancelled() and os.path.exists(output_path)
 

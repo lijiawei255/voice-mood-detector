@@ -856,6 +856,8 @@ class MainWindow(QMainWindow):
         self.is_research_mode = False
         self.research_session = None
         self._research_running = False
+        # 科研模式：当前是否正在录制某一段样本（决定录音按钮是"停止当前段"还是禁用）
+        self._research_recording_sample = False
         self.baseline_manager = None
         self.current_result = None
         self._collecting_baseline = False
@@ -2038,6 +2040,7 @@ class MainWindow(QMainWindow):
     def _reset_recording_ui(self):
         self.is_recording = False
         self.is_analyzing = False
+        self._research_recording_sample = False
         self.record_btn.setText("点击开始录音")
         self.record_btn.setProperty("isRecording", "false")
         self.record_btn.style().unpolish(self.record_btn)
@@ -2047,13 +2050,25 @@ class MainWindow(QMainWindow):
         self.record_progress.setRange(0, 100)
         self.record_progress.setValue(0)
         self._set_buttons_enabled(True)
+        # 恢复模式切换与模型切换（科研模式异常退出后也可能走到这里）
+        self.mode_quick.setEnabled(True)
+        self.mode_research.setEnabled(True)
+        self.model_switch_btn.setEnabled(True)
 
     def _start_research_session(self):
         """启动科研评估会话"""
         # 用显式运行标志判断是否进行中，避免依赖会话对象的 cancelled 状态
         # （正常完成后 cancelled 仍为 False，会导致第二次会话永远被拦截）
         if self._research_running:
-            QMessageBox.information(self, "请稍候", "科研评估正在进行中")
+            if self._research_recording_sample and self.research_session is not None:
+                # 用户点击录音按钮 → 手动停止当前段（会话继续）
+                self.append_log("用户手动停止当前段录音")
+                self.record_btn.setEnabled(False)
+                self.record_btn.setText("科研评估进行中...")
+                self._research_recording_sample = False
+                self.research_session.request_stop_current_sample()
+            else:
+                QMessageBox.information(self, "请稍候", "科研评估正在处理中，请等待当前步骤完成")
             return
 
         if not self.recognizer or not self.recognizer.is_ready():
@@ -2074,6 +2089,10 @@ class MainWindow(QMainWindow):
         self.record_progress.setValue(5)
         self.quality_feedback.setText("准备录音...")
         self._set_buttons_enabled(False)
+        # 会话期间禁用模式切换与模型切换，防止状态不一致
+        self.mode_quick.setEnabled(False)
+        self.mode_research.setEnabled(False)
+        self.model_switch_btn.setEnabled(False)
         self._research_running = True
 
         self.research_session = ResearchSession(self.recorder, self.recognizer)
@@ -2104,19 +2123,45 @@ class MainWindow(QMainWindow):
             self.record_progress.setValue(progress)
             self.quality_feedback.setText(message)
             self.append_log(f"[科研模式] {phase}: {message}")
+
+            # 录音按钮状态机：仅"record"段允许手动停止当前段，其他阶段禁用
+            if phase == "record":
+                if not self._research_recording_sample:
+                    self._research_recording_sample = True
+                    self.record_btn.setEnabled(True)
+                    self.record_btn.setText("点击停止当前录音")
+                    self.record_btn.setProperty("isRecording", "true")
+                    self.record_btn.style().unpolish(self.record_btn)
+                    self.record_btn.style().polish(self.record_btn)
+            else:
+                if self._research_recording_sample:
+                    self._research_recording_sample = False
+                    self.record_btn.setProperty("isRecording", "false")
+                    self.record_btn.style().unpolish(self.record_btn)
+                    self.record_btn.style().polish(self.record_btn)
+                self.record_btn.setEnabled(False)
+                self.record_btn.setText("科研评估进行中...")
         except Exception as e:
             logger.error(f"科研进度更新异常: {e}")
 
     def _on_research_finished(self, result):
         """科研模式完成回调（主线程槽）"""
         self._research_running = False
+        self._research_recording_sample = False
         if self._closing:
             return
         try:
             self.record_progress.setValue(100)
             self.record_btn.setEnabled(True)
             self.record_btn.setText("开始科研评估")
+            self.record_btn.setProperty("isRecording", "false")
+            self.record_btn.style().unpolish(self.record_btn)
+            self.record_btn.style().polish(self.record_btn)
             self._set_buttons_enabled(True)
+            # 恢复模式切换与模型切换
+            self.mode_quick.setEnabled(True)
+            self.mode_research.setEnabled(True)
+            self.model_switch_btn.setEnabled(True)
             if result.get("success"):
                 self.quality_feedback.setText("科研评估完成")
                 self.status_label.setText("科研评估完成")
