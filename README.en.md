@@ -15,7 +15,7 @@ Voice Mood Detector is a deep learning-based desktop application that records yo
 
 The system adopts a **portable mode** design — all user data (recordings, models, history, logs, etc.) is saved in the program folder. You can copy the entire program folder to migrate all data without polluting system directories.
 
-The UI follows **Soviet Constructivist** design principles: thick charcoal-black borders, brick-red accents (#C44B4F), 45° diagonal textures, triangular wedge decorations, pure geometry with no rounded corners, warm off-white industrial base (#F2EDE4), and asymmetrical card layouts.
+The UI follows a **minimalist (Swiss/Bauhaus)** design: a clean white background, thin hairline borders, a single blue accent color (#1A73E8), generous whitespace, subtle rounded corners, and no decorative elements — function over ornament. Typography uses **Microsoft YaHei UI** for text and **Cascadia Code** for numeric displays (with graceful fallbacks), at comfortable, readable sizes.
 
 > ⚠️ **Disclaimer**: This software is for personal non-commercial reference only. The detection results are only an auxiliary reference for emotional state and do not constitute any medical diagnosis or advice. If you have persistent emotional distress, please consult a professional psychologist promptly.
 
@@ -219,24 +219,27 @@ git clone https://github.com/lijiawei255/voice-mood-detector.git
 cd Voice_Mood_Detect
 ```
 
-2. **Create virtual environment (recommended)**
+2. **Create an Anaconda virtual environment (recommended)**
+
+This project depends on PyQt5, librosa, PyTorch, funasr, etc. **Using Anaconda to create an isolated environment is strongly recommended** to avoid dependency conflicts and PyAudio build failures:
 
 ```bash
-python -m venv venv
-# Windows
-venv\Scripts\activate
+# Create an environment named voice_mood (Python 3.10 tested; 3.8~3.11 all work)
+conda create -n voice_mood python=3.10 -y
+conda activate voice_mood
+
+# Install libraries that require local compilation (PyAudio) via conda first
+conda install -c conda-forge pyaudio -y
 ```
 
-3. **Install dependencies**
+3. **Install the remaining dependencies**
 
 ```bash
+# Make sure you are still in the voice_mood environment
 pip install -r requirements.txt
 ```
 
-> 💡 **Tip**: If PyAudio installation fails, try using conda:
-> ```bash
-> conda install pyaudio -y
-> ```
+> 💡 **Tip**: If `pip install` still fails on PyAudio, install it separately with `conda install -c conda-forge pyaudio` above, then re-run `pip install -r requirements.txt`.
 
 ### Run the Program
 
@@ -410,6 +413,7 @@ main.py
               ├── chart.py / research_panel.py          (trend / radar charts)
               ├── baseline_panel.py / stats_panel.py    (baseline / stats panel)
               ├── score_card.py / background.py         (score card / background)
+              ├── fonts.py                              (UI_FONT / MONO_FONT definitions)
               ├── threads.py / toast.py                 (worker threads / toasts)
               └── __init__.py
 ```
@@ -482,11 +486,14 @@ git clone https://github.com/lijiawei255/voice-mood-detector.git
 cd Voice_Mood_Detect
 
 # Create virtual environment
-python -m venv venv
-venv\Scripts\activate
+# Create an Anaconda virtual environment (same as Quick Start)
+conda create -n voice_mood python=3.10 -y
+conda activate voice_mood
+conda install -c conda-forge pyaudio -y
 
-# Install development dependencies
+# Install development dependencies (includes runtime deps)
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
 # Run the program
 python main.py

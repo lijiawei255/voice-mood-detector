@@ -15,6 +15,7 @@
 
 系统采用**便携模式**设计，所有用户数据（录音、模型、历史记录、日志等）都保存在程序文件夹中，复制整个程序文件夹即可迁移所有数据，不污染系统目录。
 
+界面采用**极简主义（瑞士/包豪斯）**设计风格：纯白背景、细线边框、单一蓝色强调色（#1A73E8）、大量留白、适度圆角、无装饰元素——功能优先。字体使用 **微软雅黑 UI**（中文）与 **Cascadia Code**（数字），字号舒适易读（支持回退）。
 
 > ⚠️ **免责声明**：本软件仅供个人非商用参考使用，检测结果仅作为情绪状态的辅助参考，不构成任何医疗诊断或建议。如有持续的情绪困扰，请及时咨询专业心理医生。
 
@@ -217,24 +218,27 @@ git clone https://github.com/lijiawei255/voice-mood-detector.git
 cd Voice_Mood_Detect
 ```
 
-2. **创建虚拟环境（推荐）**
+2. **创建 Anaconda 虚拟环境（推荐）**
+
+本项目依赖 PyQt5、librosa、PyTorch、funasr 等，**强烈建议使用 Anaconda 创建独立环境**，可避免依赖冲突与 PyAudio 编译失败等问题：
 
 ```bash
-python -m venv venv
-# Windows
-venv\Scripts\activate
+# 创建名为 voice_mood 的环境（Python 3.10 已测试通过，3.8~3.11 均可）
+conda create -n voice_mood python=3.10 -y
+conda activate voice_mood
+
+# 优先用 conda 安装需要本地编译的库（PyAudio）
+conda install -c conda-forge pyaudio -y
 ```
 
-3. **安装依赖**
+3. **安装其余依赖**
 
 ```bash
+# 确保仍在刚创建的 voice_mood 环境中
 pip install -r requirements.txt
 ```
 
-> 💡 **提示**：如果 PyAudio 安装失败，可以尝试使用 conda 安装：
-> ```bash
-> conda install pyaudio -y
-> ```
+> 💡 **提示**：若 `pip install` 时 PyAudio 仍报错，请用上一步的 `conda install -c conda-forge pyaudio` 单独安装，再重新 `pip install -r requirements.txt`。
 
 ### 运行程序
 
@@ -408,6 +412,7 @@ main.py
               ├── chart.py / research_panel.py          (趋势图 / 雷达图)
               ├── baseline_panel.py / stats_panel.py    (基线 / 统计面板)
               ├── score_card.py / background.py         (分数卡 / 背景)
+              ├── fonts.py                              (字体集中定义 UI_FONT/MONO_FONT)
               ├── threads.py / toast.py                 (后台线程 / 通知)
               └── __init__.py
 ```
@@ -479,12 +484,14 @@ portable_data/
 git clone https://github.com/lijiawei255/voice-mood-detector.git
 cd Voice_Mood_Detect
 
-# 创建虚拟环境
-python -m venv venv
-venv\Scripts\activate
+# 创建 Anaconda 虚拟环境（与快速开始一致）
+conda create -n voice_mood python=3.10 -y
+conda activate voice_mood
+conda install -c conda-forge pyaudio -y
 
-# 安装开发依赖
+# 安装开发依赖（含运行依赖）
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
 # 运行程序
 python main.py

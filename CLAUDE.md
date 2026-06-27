@@ -5,12 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Environment
 
 ```bash
-# Create and activate a virtual environment (recommended)
-python -m venv venv
-# Windows
-venv\Scripts\activate
-# macOS / Linux
-source venv/bin/activate
+# Create and activate an Anaconda environment (recommended)
+conda create -n voice_mood python=3.10 -y
+conda activate voice_mood
+
+# Install libraries that need local compilation (PyAudio) via conda first
+conda install -c conda-forge pyaudio -y
 
 # Install dependencies
 pip install -r requirements.txt
@@ -18,7 +18,7 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 ```
 
-Supported Python versions: 3.8 ~ 3.11. PyQt5 is required for GUI tests; headless/CI tests skip GUI imports if PyQt5 is unavailable.
+Supported Python versions: 3.8 ~ 3.11 (3.10 tested). PyQt5 is required for GUI tests; headless/CI tests skip GUI imports if PyQt5 is unavailable.
 
 ## Run
 

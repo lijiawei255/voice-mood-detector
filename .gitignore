@@ -36,6 +36,7 @@ recordings/
 history.json
 history.json.bak
 history.json.corrupted
+baseline.json
 model_config.json
 *.wav
 *.mp3
