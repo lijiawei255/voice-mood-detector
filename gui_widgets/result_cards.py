@@ -32,9 +32,8 @@ class DimensionBar(QWidget):
     用于可视化展示效价(Valence)、唤醒度(Arousal)、掌控感(Dominance)三个维度。
     每个维度显示为一个水平条形指示器，左侧标签 + 彩色条 + 数值。
 
-    效价：红色(-) ↔ 绿色(+)
-    唤醒度：蓝色(低) ↔ 橙色(高)
-    掌控感：灰色(低) ↔ 金色(高)
+    采用苏联构成主义 5 色调色板（炭黑 #2B2B2B / 砖红 #C44B4F / 暖灰 #8A8580），
+    各维度通过 low_color/high_color 在调色板内取色，不使用额外色相。
     """
 
     def __init__(self, label, value, range_min, range_max,
@@ -57,6 +56,8 @@ class DimensionBar(QWidget):
         self._high_color = QColor(high_color)
         self.setMinimumHeight(32)
         self.setMaximumHeight(40)
+        # 保证标签(70) + 条形最小宽度 + 数值(55) 不致 bar_w 变为负值
+        self.setMinimumWidth(150)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     def paintEvent(self, event):
@@ -74,7 +75,7 @@ class DimensionBar(QWidget):
 
         # 条形背景
         bar_x = 72
-        bar_w = w - bar_x - 60
+        bar_w = max(0, w - bar_x - 60)
         bar_h = 14
         bar_y = (h - bar_h) // 2
         painter.setPen(Qt.NoPen)
@@ -356,7 +357,8 @@ class ResultCardWidget(QFrame):
         # 可靠性标签
         reliability = result.get('assessment_reliability', '')
         if reliability:
-            rel_colors = {"高": "#C44B4F", "中": "#8A8580", "低": "#C44B4F"}
+            # 高→炭黑（正面强调）、中→暖灰、低→砖红（警示），三者可区分
+            rel_colors = {"高": "#2B2B2B", "中": "#8A8580", "低": "#C44B4F"}
             rel_color = rel_colors.get(reliability, "#8A8580")
             self.reliability_label.setText(f"可靠性: {reliability}")
             self.reliability_label.setStyleSheet(

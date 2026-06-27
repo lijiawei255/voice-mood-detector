@@ -890,6 +890,12 @@ class EmotionRecognizer:
             self.loaded = False
             self.model_name = original_model
             self.load_model()
+            # 等待原模型加载完成，避免返回后下一次 predict() 因模型未加载而失败
+            import time
+            waited_restore = 0
+            while not self.loaded and waited_restore < 60:
+                time.sleep(0.5)
+                waited_restore += 0.5
 
             # 评估模型一致性
             from reliability import evaluate_model_agreement
@@ -899,7 +905,7 @@ class EmotionRecognizer:
             dual_result = dict(primary_result)
             dual_result.update({
                 "is_dual_model": True,
-                "primary_model": self.model_name,
+                "primary_model": original_model,
                 "secondary_model": secondary_model,
                 "model_agreement": agreement["agreement"],
                 "result_reliability": agreement["level"],

@@ -232,7 +232,7 @@ class HistoryManager:
                 "audio_quality": result.get("audio_quality", {}),
                 # P0 新增：实验元数据
                 "model_name": result.get("model_name", ""),
-                "algorithm_version": result.get("algorithm_version", "2.0.0-p0"),
+                "algorithm_version": result.get("algorithm_version", "2.0.0-p2"),
                 "app_version": result.get("app_version", "2.0.0"),
                 "is_research_mode": bool(result.get("is_research_mode", False)),
                 "assessment_reliability": str(result.get("assessment_reliability", ""))[:20],
@@ -547,11 +547,17 @@ class HistoryManager:
 
         import numpy as np
 
+        # 样本标准差（ddof=1）：样本量 < 2 时退化为 0，避免 nan
+        def _sample_std(values):
+            if len(values) < 2:
+                return 0
+            return round(float(np.std(values, ddof=1)), 2)
+
         return {
             "record_count": n,
             "stability": {
                 "mean": round(float(np.mean(stability_scores)), 2) if stability_scores else 0,
-                "std": round(float(np.std(stability_scores)), 2) if stability_scores else 0,
+                "std": _sample_std(stability_scores) if stability_scores else 0,
                 "min": round(float(np.min(stability_scores)), 2) if stability_scores else 0,
                 "max": round(float(np.max(stability_scores)), 2) if stability_scores else 0,
             },
@@ -606,10 +612,12 @@ class HistoryManager:
 
         import numpy as np
         mean_val = float(np.mean(scores))
-        std_val = float(np.std(scores))
+        # 样本标准差（ddof=1）：样本量 < 2 时退化为 0，避免 nan
+        std_val = float(np.std(scores, ddof=1)) if len(scores) >= 2 else 0.0
 
         # 简单趋势判断（最近5条 vs 总体均值）
-        recent = scores[:min(5, len(scores))]
+        # self.records 为升序（最旧在前），故取末尾 5 条作为「最近」
+        recent = scores[-min(5, len(scores)):]
         recent_mean = float(np.mean(recent)) if recent else mean_val
         if recent_mean > mean_val + 1.0:
             trend = "上升（情绪稳定性下降）"

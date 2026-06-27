@@ -194,13 +194,13 @@ class PersonalBaseline:
 
             self.data["baseline"] = {
                 "stability_mean": round(float(np.mean(stability_scores)), 2),
-                "stability_std": round(float(np.std(stability_scores)), 2),
+                "stability_std": round(float(np.std(stability_scores, ddof=1)), 2),
                 "valence_mean": round(float(np.mean(valences)), 4),
-                "valence_std": round(float(np.std(valences)), 4),
+                "valence_std": round(float(np.std(valences, ddof=1)), 4),
                 "arousal_mean": round(float(np.mean(arousals)), 4),
-                "arousal_std": round(float(np.std(arousals)), 4),
+                "arousal_std": round(float(np.std(arousals, ddof=1)), 4),
                 "dominance_mean": round(float(np.mean(dominances)), 4),
-                "dominance_std": round(float(np.std(dominances)), 4),
+                "dominance_std": round(float(np.std(dominances, ddof=1)), 4),
                 "negative_load_mean": round(float(np.mean(neg_loads)), 4),
                 "calm_prob_distribution": prob_baseline,
                 "acoustic_baseline": acoustic_baseline,

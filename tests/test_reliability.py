@@ -54,6 +54,22 @@ class TestComputeICC(unittest.TestCase):
         self.assertLess(icc, 0.3)
         self.assertGreaterEqual(icc, -1.0)
 
+    def test_moderate_reliability_standard_icc(self):
+        """中等变异数据应匹配标准 ICC(2,1) 一致性公式值
+
+        旧实现 (MSB-MSW)/(MSB+MSW) 对该数据返回约 0.857（虚高），
+        标准 ICC(2,1) 一致性约为 0.80。此处锁定标准值。
+        """
+        values = [
+            [5.0, 7.0, 6.0],
+            [8.0, 10.0, 9.0],
+            [3.0, 5.0, 4.0],
+            [6.0, 8.0, 7.0],
+        ]
+        icc = compute_icc(values)
+        # 标准 ICC(2,1) = 0.8000
+        self.assertAlmostEqual(icc, 0.8000, places=3)
+
     def test_insufficient_sessions(self):
         """session 不足时应返回 0.0"""
         self.assertEqual(compute_icc([]), 0.0)

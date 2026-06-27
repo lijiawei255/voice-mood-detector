@@ -48,7 +48,8 @@ def cohens_d(group1, group2, paired=False):
         g2 = np.array(group2, dtype=float)
 
         if len(g1) < 2 or len(g2) < 2:
-            return {"d": 0.0, "interpretation": "样本量不足", "magnitude": "N/A"}
+            return {"d": 0.0, "interpretation": "样本量不足", "magnitude": "N/A",
+                    "mean_diff": 0.0, "pooled_sd": 0.0}
 
         mean_diff = np.mean(g2) - np.mean(g1)
 
@@ -77,7 +78,8 @@ def cohens_d(group1, group2, paired=False):
         }
     except Exception as e:
         logger.error(f"Cohen's d 计算失败: {e}")
-        return {"d": 0.0, "interpretation": "计算失败", "magnitude": "N/A"}
+        return {"d": 0.0, "interpretation": "计算失败", "magnitude": "N/A",
+                "mean_diff": 0.0, "pooled_sd": 0.0}
 
 
 def _interpret_cohens_d(d):

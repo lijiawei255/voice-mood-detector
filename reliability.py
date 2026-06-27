@@ -32,9 +32,17 @@ MODEL_AGREEMENT_NOTE = (
 
 def compute_icc(values_across_sessions):
     """
-    计算组内相关系数 (ICC, two-way random, single measures)
+    计算组内相关系数 (ICC(2,1), two-way random, single measures, consistency)
 
     用于评估测试-重测信度。需要同一被试多次测量的相同指标。
+    采用 Shrout & Fleiss (1979) 的 ICC(2,1) 一致性公式：
+
+        ICC = (MSR - MSE) / (MSR + (k - 1) * MSE)
+
+    其中：
+        MSR = 行间（session 间）均方 = k * Σ(会话均值 - 总均值)² / (n - 1)
+        MSE = 残差（会话内）均方 = ΣΣ(观测 - 会话均值)² / (n * (k - 1))
+        n = 会话数，k = 每个会话的测量次数
 
     参数：
         values_across_sessions (list of list): 每个session的测量值列表
@@ -57,20 +65,23 @@ def compute_icc(values_across_sessions):
         # 总均值
         grand_mean = np.mean(data)
 
-        # 组间均方 (MSB)
+        # 行间均方 MSR（between-sessions / rows）
         session_means = np.mean(data, axis=1)
-        msb = n_measures * np.sum((session_means - grand_mean) ** 2) / (n_sessions - 1) if n_sessions > 1 else 0.0
+        ssr = n_measures * np.sum((session_means - grand_mean) ** 2)
+        msr = ssr / (n_sessions - 1) if n_sessions > 1 else 0.0
 
-        # 组内均方 (MSW)
-        msw = 0.0
+        # 残差均方 MSE（within-session / error）
+        sse = 0.0
         for i in range(n_sessions):
-            msw += np.sum((data[i] - session_means[i]) ** 2)
-        msw /= (n_sessions * (n_measures - 1)) if n_measures > 1 else 1.0
+            sse += np.sum((data[i] - session_means[i]) ** 2)
+        mse = sse / (n_sessions * (n_measures - 1)) if n_measures > 1 else 0.0
 
-        if msb + msw < 1e-10:
+        # ICC(2,1) 一致性：分母含 (k-1)*MSE 项
+        denominator = msr + (n_measures - 1) * mse
+        if denominator < 1e-10:
             return 0.0
 
-        icc = (msb - msw) / (msb + msw)
+        icc = (msr - mse) / denominator
         return round(max(-1.0, min(1.0, icc)), 4)
 
     except Exception as e:

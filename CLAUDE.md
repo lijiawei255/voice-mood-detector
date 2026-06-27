@@ -5,13 +5,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Environment
 
 ```bash
-# Activate conda environment (recommended)
-conda activate audio
-# Or use full path:
-# C:\Users\xiaol\anaconda3\envs\audio\python.exe
+# Create and activate a virtual environment (recommended)
+python -m venv venv
+# Windows
+venv\Scripts\activate
+# macOS / Linux
+source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
+# Optional: test dependencies
+pip install -r requirements-dev.txt
 ```
 
 Supported Python versions: 3.8 ~ 3.11. PyQt5 is required for GUI tests; headless/CI tests skip GUI imports if PyQt5 is unavailable.
@@ -25,11 +29,11 @@ python main.py
 ## Test
 
 ```bash
-# Run all tests (recommended in conda 'audio' env)
+# Run all tests
 python -m pytest tests/ -v
 
-# Latest status (audio env): 150 passed, 7 skipped
-# Latest status (standalone Python 3.11 without PyQt5): 147 passed, 10 skipped
+# Latest status (standalone Python 3.11 without PyQt5): 150 passed, 10 skipped
+# (With PyQt5 installed, the 10 GUI-skipped tests also run.)
 
 # Run a single test
 python -m pytest tests/test_emotion.py -v

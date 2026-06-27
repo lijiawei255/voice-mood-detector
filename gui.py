@@ -15,7 +15,8 @@
 7. 自定义控件：分数卡片（ScoreCard）、趋势图（MplCanvas）、Toast通知
 
 界面设计特点：
-- 采用卡片式布局，现代化渐变设计
+- 苏联构成主义（Soviet Constructivist）风格：粗炭黑边框、砖红强调、暖白底
+- 严格 5 色调色板（#2B2B2B / #C44B4F / #F2EDE4 / #E8E3DA / #8A8580），无圆角、无渐变
 - 左右分栏设计，左侧为主操作区，右侧为快速指南
 - 支持高 DPI 适配，中文界面清晰
 - 全中文界面，用户友好
@@ -55,7 +56,7 @@ from gui_widgets.assessment_cards import (
 from gui_widgets.score_card import ScoreCard
 from gui_widgets.background import ConstructivistBackground
 from gui_widgets.chart import MplCanvas
-from gui_widgets.threads import RecordingThread, AnalysisThread, ModelLoadThread
+from gui_widgets.threads import RecordingThread, AnalysisThread
 from gui_widgets.toast import ToastNotification, ToastManager
 from gui_widgets.baseline_panel import BaselinePanel
 from gui_widgets.stats_panel import StatsPanel
@@ -431,7 +432,7 @@ class ModelSwitchDialog(QDialog):
                     padding: 12px 15px;
                     border: 2px solid {'#C44B4F' if is_current else '#2B2B2B'};
                     border-radius: 0px;
-                    background-color: {'#F2EDE4' if is_current else '#FFFFFF'};
+                    background-color: {'#F2EDE4' if is_current else '#E8E3DA'};
                     font-weight: bold;
                 }}
                 QRadioButton:hover {{
@@ -842,13 +843,15 @@ class MainWindow(QMainWindow):
     log_signal = pyqtSignal(str)
     model_loaded_signal = pyqtSignal(bool, str)
     model_progress_signal = pyqtSignal(str)
+    # 科研模式后台线程 → 主线程的安全通信信号（避免跨线程操作 Qt 控件）
+    research_progress_signal = pyqtSignal(str, str, int)
+    research_finished_signal = pyqtSignal(dict)
 
     def __init__(self):
         super().__init__()
         self.recorder = AudioRecorder()
         self.recording_thread = None
         self.analysis_thread = None
-        self.model_load_thread = None
         self.is_recording = False
         self.is_analyzing = False
         self.current_audio_path = None
@@ -861,6 +864,7 @@ class MainWindow(QMainWindow):
         # P1/P2 新增：评估模式与基线管理
         self.is_research_mode = False
         self.research_session = None
+        self._research_running = False
         self.baseline_manager = None
         self.current_result = None
         self._collecting_baseline = False
@@ -873,6 +877,8 @@ class MainWindow(QMainWindow):
         self.log_signal.connect(self._append_log_safe)
         self.model_loaded_signal.connect(self._on_model_loaded_safe)
         self.model_progress_signal.connect(self._append_log_safe)
+        self.research_progress_signal.connect(self._on_research_progress)
+        self.research_finished_signal.connect(self._on_research_finished)
 
         self.toast_manager = ToastManager(self)
 
@@ -1651,11 +1657,24 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
 
-        layout.addWidget(splitter)
+        # 将 splitter + 统计面板装入一个可滚动容器，
+        # 避免窗口高度不足时统计面板（含最小高度 200 的 QTextEdit）被挤压/截断
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_layout.setSpacing(12)
+        scroll_layout.addWidget(splitter)
 
         # P0 新增：历史统计面板
         self.stats_panel = StatsPanel()
-        layout.addWidget(self.stats_panel)
+        scroll_layout.addWidget(self.stats_panel)
+
+        history_scroll = QScrollArea()
+        history_scroll.setWidgetResizable(True)
+        history_scroll.setFrameShape(QFrame.NoFrame)
+        history_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        history_scroll.setWidget(scroll_content)
+        layout.addWidget(history_scroll, 1)
 
         self.tab_widget.addTab(history_widget, "▸ 历史报告")
 
@@ -2134,7 +2153,9 @@ class MainWindow(QMainWindow):
 
     def _start_research_session(self):
         """启动科研评估会话"""
-        if self.research_session and self.research_session._is_cancelled() is False:
+        # 用显式运行标志判断是否进行中，避免依赖会话对象的 cancelled 状态
+        # （正常完成后 cancelled 仍为 False，会导致第二次会话永远被拦截）
+        if self._research_running:
             QMessageBox.information(self, "请稍候", "科研评估正在进行中")
             return
 
@@ -2156,16 +2177,45 @@ class MainWindow(QMainWindow):
         self.record_progress.setValue(5)
         self.quality_feedback.setText("环境检测中...")
         self._set_buttons_enabled(False)
+        self._research_running = True
 
         self.research_session = ResearchSession(self.recorder, self.recognizer)
 
+        # 后台线程仅 emit 信号，绝不直接操作 Qt 控件（避免跨线程崩溃）
         def on_progress(phase, message, progress):
-            self.status_label.setText(f"■ {phase}: {message[:20]}")
+            self.research_progress_signal.emit(phase, message, progress)
+
+        def on_finished(result):
+            self.research_finished_signal.emit(result)
+
+        self.research_session.run_async(
+            prompt_text=prompt,
+            n_samples=3,
+            use_dual_model=True,
+            progress_callback=on_progress,
+            finished_callback=on_finished,
+        )
+
+    def _on_research_progress(self, phase, message, progress):
+        """科研模式进度回调（主线程槽）"""
+        if self._closing:
+            return
+        try:
+            # 状态栏截断显示并补省略号
+            short_msg = message[:20] + ("…" if len(message) > 20 else "")
+            self.status_label.setText(f"■ {phase}: {short_msg}")
             self.record_progress.setValue(progress)
             self.quality_feedback.setText(message)
             self.append_log(f"[科研模式] {phase}: {message}")
+        except Exception as e:
+            logger.error(f"科研进度更新异常: {e}")
 
-        def on_finished(result):
+    def _on_research_finished(self, result):
+        """科研模式完成回调（主线程槽）"""
+        self._research_running = False
+        if self._closing:
+            return
+        try:
             self.record_progress.setValue(100)
             self.record_btn.setEnabled(True)
             self.record_btn.setText("■ 开始科研评估")
@@ -2185,14 +2235,8 @@ class MainWindow(QMainWindow):
                 self.status_label.setText("■ 科研评估失败")
                 self.append_log(f"科研评估失败: {result.get('error')}")
                 QMessageBox.warning(self, "科研评估失败", result.get("error", "未知错误"))
-
-        self.research_session.run_async(
-            prompt_text=prompt,
-            n_samples=3,
-            use_dual_model=True,
-            progress_callback=on_progress,
-            finished_callback=on_finished,
-        )
+        except Exception as e:
+            logger.error(f"科研完成处理异常: {e}", exc_info=True)
 
     def start_recording_action(self):
         try:
@@ -2576,6 +2620,13 @@ class MainWindow(QMainWindow):
         first['model_agreement'] = result.get('model_agreement')
         first['consistency'] = result.get('consistency')
         first['is_research_session'] = True
+        # 透传会话级可靠性，确保 ResultCardWidget 的可靠性标签与 ReliabilityBadge 一致
+        first['assessment_reliability'] = (
+            first.get('assessment_reliability')
+            or result.get('assessment_reliability')
+            or result.get('overall_reliability')
+            or ''
+        )
         self._update_assessment_cards(first)
 
         # 显示会话级汇总
@@ -2615,8 +2666,6 @@ class MainWindow(QMainWindow):
                 probs = result.get('所有情绪概率', {})
                 main_emotion = result.get('主要情绪', '未知')
                 confidence = result.get('置信度', 0.0)
-                advice = result.get('调节建议', '')
-                mixed_emotions = result.get('混合情绪', [])
 
                 result['audio_file'] = self.current_audio_path
 
@@ -2963,6 +3012,15 @@ class MainWindow(QMainWindow):
 
             if self.analysis_thread and self.analysis_thread.isRunning():
                 self.analysis_thread.wait(2000)
+
+            # 科研模式后台线程：取消并等待其退出，防止回调触碰已销毁的窗口
+            if self._research_running and self.research_session:
+                try:
+                    self.research_session.cancel()
+                except Exception:
+                    pass
+                # 后台为 daemon 线程，短暂等待后即可让其在 _closing 保护下退出
+                time.sleep(0.5)
 
             self.cleanup_all_temp_files()
 

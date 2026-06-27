@@ -108,6 +108,26 @@ class TestExportManager(unittest.TestCase):
         self.assertIn("entropy_score", header)
         self.assertIn("extremity_score", header)
 
+    def test_export_records_csv_compound_description(self):
+        """CSV compound_emotion_description 应读取 detail['desc'] 而非 'description'"""
+        records = [
+            self._make_record(
+                compound_emotion="焦虑",
+                compound_emotion_detail={"name": "焦虑", "desc": "恐惧与悲伤的复合情绪", "confidence": 0.6},
+            ),
+        ]
+        output_path = os.path.join(self.temp_dir, "compound.csv")
+        self.assertTrue(export_records_csv(records, output_path))
+
+        with open(output_path, "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        self.assertEqual(len(rows), 1)
+        # 关键修复点：desc 键必须被正确导出，不能为空
+        self.assertEqual(rows[0]["compound_emotion"], "焦虑")
+        self.assertEqual(rows[0]["compound_emotion_description"], "恐惧与悲伤的复合情绪")
+
     def test_export_records_csv_empty(self):
         """空记录列表应导出失败"""
         output_path = os.path.join(self.temp_dir, "empty.csv")

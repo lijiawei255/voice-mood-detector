@@ -226,7 +226,8 @@ class ReliabilityBadge(_ConstructivistCard):
             self.hide()
             return
 
-        colors = {"高": "#C44B4F", "中": "#8A8580", "低": "#C44B4F"}
+        # 高→炭黑（正面强调）、中→暖灰、低→砖红（警示），三者可区分
+        colors = {"高": "#2B2B2B", "中": "#8A8580", "低": "#C44B4F"}
         color = colors.get(reliability, "#8A8580")
         self.level_lbl.setText(f"{reliability}")
         self.level_lbl.setStyleSheet(f"color: {color}; font-weight: bold;")

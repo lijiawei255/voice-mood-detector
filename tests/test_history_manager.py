@@ -165,6 +165,19 @@ class TestHistoryManager(unittest.TestCase):
         self.assertIn("trend", summary)
         self.assertGreater(summary["mean"], 0)
 
+    def test_get_stability_summary_recent_is_newest(self):
+        """recent_mean 应基于最近（最新）5 条而非最旧 5 条
+
+        records 为升序（最旧在前）。构造 6 条递增记录，验证 recent_mean
+        等于最后 5 条的均值，而非前 5 条。
+        """
+        for s in [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]:
+            self.manager.add_record(self._make_result(情绪稳定度分数=s))
+
+        summary = self.manager.get_stability_summary()
+        # 最近 5 条 = [2,3,4,5,6]，均值 4.0；最旧 5 条 = [1,2,3,4,5]，均值 3.0
+        self.assertEqual(summary["recent_mean"], 4.0)
+
     def test_get_compound_emotion_stats(self):
         """get_compound_emotion_stats 返回复合情绪频次"""
         self.manager.add_record(self._make_result(复合情绪="焦虑"))

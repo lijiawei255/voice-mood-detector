@@ -55,9 +55,9 @@
 
 | 模型 | 参数规模 | 速度 | 精度 | 适用场景 |
 |------|----------|------|------|----------|
-| emotion2vec_plus_seed | ~200MB | ⚡⚡⚡ 最快 | ★★★ | 低配置设备、快速体验 |
-| emotion2vec_plus_base | ~500MB | ⚡⚡ 均衡 | ★★★★ | 日常使用、精度与速度兼顾 |
-| emotion2vec_plus_large | ~1GB | ⚡ 较慢 | ★★★★★ | 精度优先（推荐） |
+| emotion2vec_plus_seed | ~1.1GB | ⚡⚡⚡ 最快 | ★★★ | 低配置设备、快速体验 |
+| emotion2vec_plus_base | ~1.1GB | ⚡⚡ 均衡 | ★★★★ | 日常使用、精度与速度兼顾 |
+| emotion2vec_plus_large | ~1.9GB | ⚡ 较慢 | ★★★★★ | 精度优先（推荐） |
 
 **模型输出**：8 种基础情绪分类的概率分布
 
@@ -205,7 +205,7 @@ H = -Σ p(i) × log₂(p(i))    归一化到 0-10
 | 操作系统 | Windows 10 / Windows 11 |
 | Python 版本 | 3.8 ~ 3.11 |
 | 内存 | 建议 4GB 以上 |
-| 磁盘空间 | 至少 2GB（模型约 1GB + 运行空间） |
+| 磁盘空间 | 建议 3GB 以上（单个模型约 1~2GB，按需下载模型数量增加） |
 | 音频设备 | 可用的麦克风 |
 
 ### 安装步骤
@@ -213,7 +213,7 @@ H = -Σ p(i) × log₂(p(i))    归一化到 0-10
 1. **克隆或下载项目**
 
 ```bash
-git clone <仓库地址>
+git clone https://github.com/lijiawei255/voice-mood-detector.git
 cd Voice_Mood_Detect
 ```
 
@@ -300,9 +300,9 @@ python main.py
 ### 模型切换
 
 系统支持三种规格的模型，可根据设备性能选择：
-- **Seed（最小模型）**：~200MB，适合低配置设备
-- **Base（基础模型）**：~500MB，速度与精度均衡
-- **Large（大型模型）**：~1GB，精度最高（推荐）
+- **Seed（最小模型）**：~1.1GB，适合低配置设备
+- **Base（基础模型）**：~1.1GB，速度与精度均衡
+- **Large（大型模型）**：~1.9GB，精度最高（推荐）
 
 ### 个人基线校准
 
@@ -387,15 +387,30 @@ Voice_Mood_Detect/
 
 ```
 main.py
-  ├── app_paths.py          (环境配置)
-  └── gui.py                (主界面)
-        ├── emotion_recognizer.py  (情绪识别)
-        │     └── app_paths.py     (模型路径)
-        ├── recorder.py            (录音)
-        ├── history_manager.py     (历史记录)
-        │     └── app_paths.py     (存储路径)
-        └── relaxation_tips.py     (调节建议)
-              └── emotion_recognizer.py  (复合情绪定义)
+  ├── app_paths.py          (便携路径与环境配置)
+  └── gui.py                (主界面与交互编排)
+        ├── emotion_recognizer.py   (情绪识别核心：模型管理 + 推理 + P0/P1/P2 算法)
+        │     ├── app_paths.py      (模型路径)
+        │     ├── vad_dimensions.py (VAD 维度估计)
+        │     └── reliability.py    (评估可靠性)
+        ├── recorder.py             (线程化录音)
+        ├── research_session.py     (科研模式流程编排)
+        │     ├── audio_quality.py  (质量门控)
+        │     └── reliability.py    (多采样一致性)
+        ├── history_manager.py      (历史记录 CRUD + 统计)
+        │     └── app_paths.py      (存储路径)
+        ├── baseline.py             (个人基线建模)
+        ├── audio_quality.py        (音频质量分析)
+        ├── export_manager.py       (CSV/JSON 导出)
+        ├── relaxation_tips.py      (调节建议)
+        │     └── emotion_recognizer.py (复合情绪定义)
+        └── gui_widgets/            (可复用控件包)
+              ├── result_cards.py / assessment_cards.py (结果展示)
+              ├── chart.py / research_panel.py          (趋势图 / 雷达图)
+              ├── baseline_panel.py / stats_panel.py    (基线 / 统计面板)
+              ├── score_card.py / background.py         (分数卡 / 背景)
+              ├── threads.py / toast.py                 (后台线程 / 通知)
+              └── __init__.py
 ```
 
 ### 运行时目录
@@ -405,7 +420,7 @@ main.py
 ```
 portable_data/
 ├── recordings/        # 录音文件（WAV 格式，可删除）
-├── models/            # AI 模型文件（不可删除，约 1GB）
+├── models/            # AI 模型文件（不可删除，seed/base 约 1.1GB，large 约 1.9GB）
 │   └── models/iic/   # ModelScope 模型缓存结构
 ├── logs/              # 运行日志（可清除）
 ├── temp/              # 临时文件（可清除，含调试用截图）
@@ -462,7 +477,7 @@ portable_data/
 
 ```bash
 # 克隆项目
-git clone <仓库地址>
+git clone https://github.com/lijiawei255/voice-mood-detector.git
 cd Voice_Mood_Detect
 
 # 创建虚拟环境

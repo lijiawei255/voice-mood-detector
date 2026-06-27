@@ -5,7 +5,9 @@
 提供独立的 QThread 子类，用于在后台执行耗时操作，避免阻塞 GUI：
 - RecordingThread: 音频录制线程
 - AnalysisThread: AI 模型推理线程
-- ModelLoadThread: 模型加载线程
+
+（模型加载由 EmotionRecognizer.load_model 内部异步完成，
+ 通过 model_loaded_signal 信号回主线程，故无需独立的 ModelLoadThread。）
 
 作者：Jiawei Li
 许可证：GPL v3
@@ -99,36 +101,3 @@ class AnalysisThread(QThread):
         except Exception as e:
             logger.error(f"分析线程异常: {str(e)}", exc_info=True)
             self.analysis_error.emit(f"分析异常: {str(e)}")
-
-
-class ModelLoadThread(QThread):
-    """
-    模型加载线程类
-
-    在独立线程中加载 AI 模型，避免阻塞 GUI 启动界面。
-    通过 Qt 信号与主线程通信：
-    - model_loaded: 模型加载完成（成功或失败）
-    - progress_update: 加载进度更新
-
-    参数：
-        recognizer (EmotionRecognizer): 情绪识别器实例
-    """
-    model_loaded = pyqtSignal(bool, str)
-    progress_update = pyqtSignal(str)
-
-    def __init__(self, recognizer):
-        super().__init__()
-        self.recognizer = recognizer
-
-    def run(self):
-        def on_progress(msg):
-            self.progress_update.emit(msg)
-
-        def on_loaded(success, error):
-            self.model_loaded.emit(success, error or "")
-
-        self.recognizer.add_progress_callback(on_progress)
-        self.recognizer.load_model(callback=on_loaded)
-
-        while self.recognizer.loading:
-            self.msleep(100)

@@ -117,7 +117,7 @@ def _build_csv_row(record):
         "emotional_uncertainty": record.get('emotional_uncertainty', ''),
         "estimation_note": record.get('estimation_note', ''),
         "compound_emotion": record.get('compound_emotion', ''),
-        "compound_emotion_description": (record.get('compound_emotion_detail', {}) or {}).get('description', ''),
+        "compound_emotion_description": (record.get('compound_emotion_detail', {}) or {}).get('desc', ''),
         "audio_quality_score": audio_q.get('quality_score', ''),
         "audio_quality_label": audio_q.get('quality_label', ''),
         "speech_ratio": audio_q.get('speech_ratio', ''),

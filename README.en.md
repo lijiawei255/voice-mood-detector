@@ -56,9 +56,9 @@ This system uses the **emotion2vec+** series pre-trained models developed by Ali
 
 | Model | Size | Speed | Accuracy | Use Case |
 |-------|------|-------|----------|----------|
-| emotion2vec_plus_seed | ~200MB | ⚡⚡⚡ Fastest | ★★★ | Low-spec devices, quick trial |
-| emotion2vec_plus_base | ~500MB | ⚡⚡ Balanced | ★★★★ | Daily use, speed-accuracy balance |
-| emotion2vec_plus_large | ~1GB | ⚡ Slower | ★★★★★ | Accuracy priority (recommended) |
+| emotion2vec_plus_seed | ~1.1GB | ⚡⚡⚡ Fastest | ★★★ | Low-spec devices, quick trial |
+| emotion2vec_plus_base | ~1.1GB | ⚡⚡ Balanced | ★★★★ | Daily use, speed-accuracy balance |
+| emotion2vec_plus_large | ~1.9GB | ⚡ Slower | ★★★★★ | Accuracy priority (recommended) |
 
 **Model Output**: Probability distribution over 8 basic emotion categories
 
@@ -207,7 +207,7 @@ When multiple compound emotions are simultaneously qualified, the system selects
 | Operating System | Windows 10 / Windows 11 |
 | Python Version | 3.8 ~ 3.11 |
 | Memory | 4GB+ recommended |
-| Disk Space | At least 2GB (model ~1GB + runtime space) |
+| Disk Space | 3GB+ recommended (a single model is ~1-2GB; more if you download several models) |
 | Audio Device | Available microphone |
 
 ### Installation
@@ -215,7 +215,7 @@ When multiple compound emotions are simultaneously qualified, the system selects
 1. **Clone or download the project**
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/lijiawei255/voice-mood-detector.git
 cd Voice_Mood_Detect
 ```
 
@@ -304,7 +304,7 @@ python main.py
 The system supports three model sizes:
 - **Seed (Smallest)**: ~200MB, for low-spec devices
 - **Base (Standard)**: ~500MB, speed-accuracy balance
-- **Large (Largest)**: ~1GB, highest accuracy (recommended)
+- **Large (Largest)**: ~1.9GB, highest accuracy (recommended)
 
 ### Personal Baseline Calibration
 
@@ -389,15 +389,30 @@ Voice_Mood_Detect/
 
 ```
 main.py
-  ├── app_paths.py          (environment setup)
-  └── gui.py                (main interface)
-        ├── emotion_recognizer.py  (emotion recognition)
-        │     └── app_paths.py     (model paths)
-        ├── recorder.py            (recording)
-        ├── history_manager.py     (history records)
-        │     └── app_paths.py     (storage paths)
-        └── relaxation_tips.py     (adjustment tips)
-              └── emotion_recognizer.py  (compound emotion defs)
+  ├── app_paths.py          (portable paths & env setup)
+  └── gui.py                (main UI & interaction orchestration)
+        ├── emotion_recognizer.py   (recognition core: model mgmt + inference + P0/P1/P2)
+        │     ├── app_paths.py      (model paths)
+        │     ├── vad_dimensions.py (VAD estimation)
+        │     └── reliability.py    (assessment reliability)
+        ├── recorder.py             (threaded recording)
+        ├── research_session.py     (research-mode orchestration)
+        │     ├── audio_quality.py  (quality gating)
+        │     └── reliability.py    (multi-sample consistency)
+        ├── history_manager.py      (history CRUD + statistics)
+        │     └── app_paths.py      (storage paths)
+        ├── baseline.py             (personal baseline modeling)
+        ├── audio_quality.py        (audio quality analysis)
+        ├── export_manager.py       (CSV/JSON export)
+        ├── relaxation_tips.py      (adjustment tips)
+        │     └── emotion_recognizer.py (compound emotion defs)
+        └── gui_widgets/            (reusable widget package)
+              ├── result_cards.py / assessment_cards.py (result display)
+              ├── chart.py / research_panel.py          (trend / radar charts)
+              ├── baseline_panel.py / stats_panel.py    (baseline / stats panel)
+              ├── score_card.py / background.py         (score card / background)
+              ├── threads.py / toast.py                 (worker threads / toasts)
+              └── __init__.py
 ```
 
 ### Runtime Directories
@@ -407,7 +422,7 @@ The following directories are automatically created after program runs (portable
 ```
 portable_data/
 ├── recordings/        # Recording files (WAV format, deletable)
-├── models/            # AI model files (not deletable, ~1GB)
+├── models/            # AI model files (not deletable, seed/base ~1.1GB, large ~1.9GB)
 │   └── models/iic/   # ModelScope model cache structure
 ├── logs/              # Runtime logs (clearable)
 ├── temp/              # Temporary files (clearable, incl. debug screenshots)
@@ -464,7 +479,7 @@ Contributions to this project are welcome! You can participate in the following 
 
 ```bash
 # Clone the project
-git clone <repo-url>
+git clone https://github.com/lijiawei255/voice-mood-detector.git
 cd Voice_Mood_Detect
 
 # Create virtual environment
