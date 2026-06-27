@@ -3,12 +3,11 @@
 语音情绪识别系统 - 科研评估会话模块 (P1)
 
 本模块实现科研评估模式的完整流程编排：
-1. 环境噪声预检测（约 3 秒）
-2. 统一提示语录音（建议 10-30 秒）
-3. 音频质量门控（有效语音、音量、噪声、时长）
-4. 多次采样综合评估（默认 3 段）
-5. 双模型规模敏感性验证
-6. 多次采样一致性分析
+1. 统一提示语录音（建议 10-30 秒）
+2. 音频质量门控（有效语音、音量、噪声、时长）
+3. 多次采样综合评估（默认 3 段）
+4. 双模型规模敏感性验证
+5. 多次采样一致性分析
 
 使用方式：
     session = ResearchSession(recorder, recognizer)
@@ -44,7 +43,6 @@ class ResearchSession:
 
     # 默认配置
     DEFAULT_N_SAMPLES = 3
-    NOISE_CHECK_SECONDS = 3
     RESEARCH_MIN_DURATION = 10
     RESEARCH_MAX_DURATION = 30
 
@@ -74,56 +72,6 @@ class ResearchSession:
     def _is_cancelled(self):
         with self._lock:
             return self.cancelled
-
-    def check_environment_noise(self, duration=3):
-        """
-        检测环境噪声水平
-
-        参数：
-            duration (int): 检测时长（秒）
-
-        返回值：
-            dict: {"noise_level": 噪声水平, "ok": 是否适合录音, "message": 提示文本}
-        """
-        try:
-            import tempfile
-            temp_path = tempfile.mktemp(suffix=".wav")
-            success = self.recorder.start_recording(temp_path)
-            if not success:
-                return {"noise_level": 1.0, "ok": False, "message": "无法启动环境检测"}
-
-            waited = 0.0
-            while waited < duration and not self._is_cancelled():
-                time.sleep(0.2)
-                waited += 0.2
-
-            self.recorder.stop_recording()
-
-            if self._is_cancelled():
-                return {"noise_level": 1.0, "ok": False, "message": "环境检测已取消"}
-
-            analyzer = AudioQualityAnalyzer()
-            quality = analyzer.analyze(temp_path)
-            try:
-                os.remove(temp_path)
-            except Exception:
-                pass
-
-            if not quality:
-                return {"noise_level": 1.0, "ok": False, "message": "环境检测失败"}
-
-            noise_level = quality.get("noise_level", 1.0)
-            max_noise = AUDIO_QUALITY_THRESHOLDS.get("max_noise_level", 0.3)
-            ok = noise_level < max_noise
-            message = (
-                "环境噪声较低，适合录音" if ok
-                else "环境噪声较高，请在安静环境中重新检测"
-            )
-            return {"noise_level": noise_level, "ok": ok, "message": message}
-
-        except Exception as e:
-            logger.error(f"环境噪声检测失败: {e}")
-            return {"noise_level": 1.0, "ok": False, "message": f"检测异常: {e}"}
 
     def quality_gate(self, audio_path, is_research=True):
         """
@@ -237,21 +185,11 @@ class ResearchSession:
                     pass
 
         try:
-            _report("prepare", "科研评估模式启动", 0)
+            _report("prepare", "科研评估模式启动", 5)
 
-            # 1. 环境噪声检测
-            _report("noise", "正在进行 3 秒环境噪声检测，请保持安静...", 5)
-            noise_result = self.check_environment_noise(duration=self.NOISE_CHECK_SECONDS)
-            if not noise_result["ok"]:
-                error_result = {"success": False, "error": noise_result["message"], "phase": "noise_check"}
-                if finished_callback:
-                    finished_callback(error_result)
-                return error_result
-            _report("noise", f"环境检测通过：{noise_result['message']}", 10)
-
-            # 2. 多次采样录音
+            # 1. 多次采样录音
             if prompt_text:
-                _report("prompt", f"提示语：{prompt_text}", 12)
+                _report("prompt", f"提示语：{prompt_text}", 8)
 
             for i in range(n_samples):
                 if self._is_cancelled():

@@ -1173,7 +1173,7 @@ class MainWindow(QMainWindow):
         self.mode_research = QRadioButton("科研评估")
         self.mode_research.setFont(QFont("Microsoft YaHei", 10))
         self.mode_research.setToolTip(
-            "科研评估模式：3秒环境噪声检测 + 统一提示语 + 质量门控 + 3段采样 + 双模型验证"
+            "科研评估模式：统一提示语 + 质量门控 + 3段采样 + 双模型验证"
         )
         self.mode_quick.toggled.connect(self._on_mode_changed)
 
@@ -2072,7 +2072,7 @@ class MainWindow(QMainWindow):
         self.record_btn.setText("科研评估进行中...")
         self.record_progress.setRange(0, 100)
         self.record_progress.setValue(5)
-        self.quality_feedback.setText("环境检测中...")
+        self.quality_feedback.setText("准备录音...")
         self._set_buttons_enabled(False)
         self._research_running = True
 

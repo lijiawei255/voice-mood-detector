@@ -40,7 +40,7 @@ The UI follows **Soviet Constructivist** design principles: thick charcoal-black
 | 📡 Acoustic Feature Extraction | Clinical-grade features: F0, jitter, shimmer, HNR, MFCC |
 | 🧠 Psychological Indicators | Stress, anxiety, depression tendency, activation, speech-stability estimates (non-clinical) |
 | 🎚️ Personal Baseline | Collect 3-10 calm samples to build a baseline and show relative deviation |
-| 🔬 Research Mode | Ambient noise check, unified prompt, quality gate, 3-sample recording, optional dual-model validation |
+| 🔬 Research Mode | Unified prompt, quality gate, 3-sample recording, optional dual-model validation |
 | 📤 Research Data Export | CSV (SPSS/Excel compatible) & JSON full research dataset export |
 | 📊 History Statistics | Descriptive statistics and trend analysis for stability and VAD dimensions |
 | 🎚️ Stability Factor Breakdown | Negative weight, entropy, extremity sub-scores output |
@@ -269,10 +269,9 @@ python main.py
 
 1. Select **"Research Mode"** in the recording control area
 2. Click **"Start Research Assessment"**
-3. The system performs a ~3-second ambient noise check
-4. Record 3 samples following the unified prompt (10-30 seconds each)
-5. Each sample passes an audio quality gate; re-record if it fails
-6. After 3 samples, the system outputs:
+3. Record 3 samples following the unified prompt (10-30 seconds each)
+4. Each sample passes an audio quality gate; re-record if it fails
+5. After 3 samples, the system outputs:
    - Detailed emotion analysis for each sample
    - Session-level dominant emotion and mean stability
    - Multi-sample consistency / overall reliability
@@ -363,7 +362,7 @@ Voice_Mood_Detect/
 ├── main.py                 # Entry point: env config + PyQt5 app launch
 ├── gui.py                  # GUI: main window, widgets, interaction logic
 ├── emotion_recognizer.py   # Emotion recognition core: model + inference + algorithms
-├── research_session.py     # Research-mode orchestration (noise check / multi-sample / dual-model)
+├── research_session.py     # Research-mode orchestration (multi-sample / quality gate / dual-model)
 ├── recorder.py             # Audio recording: threaded recording + WAV save
 ├── history_manager.py      # History management: atomic write + data sanitization
 ├── audio_features.py       # Acoustic feature extraction (F0 / jitter / shimmer / HNR / MFCC)

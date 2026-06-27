@@ -74,7 +74,7 @@ Microphone → AudioRecorder → WAV file → AudioQualityAnalyzer
 | `gui.py` | Main GUI (~3000 lines) — MainWindow, tabs, dialogs, threads, result layout |
 | `gui_widgets/` | Reusable widget package — ResultCardWidget, ResearchRadarChart, BaselinePanel, StatsPanel, ScoreCard, assessment cards |
 | `emotion_recognizer.py` | AI inference wrapper — singleton, loads emotion2vec+ via FunASR, runs `predict()` with full P0/P1/P2 enrichment |
-| `research_session.py` | Research-mode orchestrator — noise check, quality gates, multi-sample recording, dual-model validation |
+| `research_session.py` | Research-mode orchestrator — quality gates, multi-sample recording, dual-model validation |
 | `recorder.py` | AudioRecorder — PyAudio-based microphone capture to WAV |
 | `history_manager.py` | JSON-based history CRUD, auto-cleanup, statistics aggregation |
 | `audio_features.py` | Acoustic feature extraction (F0, jitter, shimmer, HNR, MFCC) via librosa + praat-parselmouth fallback |
